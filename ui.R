@@ -1,12 +1,3 @@
-#
-#countries <- c("Germany", "United Kingdom", "United States")
-#
-#flags <- c(
-#  "https://cdn.rawgit.com/lipis/flag-icon-css/master/flags/4x3/de.svg",
-#  "https://cdn.rawgit.com/lipis/flag-icon-css/master/flags/4x3/gb.svg",
-#  "https://cdn.rawgit.com/lipis/flag-icon-css/master/flags/4x3/us.svg")
-#
-
 ui <- fluidPage(
   pageWithSidebar(
     
@@ -56,15 +47,18 @@ ui <- fluidPage(
       numericInput("tscore_pi", 
                    "PROMIS Pain Interference T-Score",
                    value = 50, min = 1, max = 100)),
+    
     mainPanel(
-     # fluidRow(
-     #   column(width = 6,
+      # Keep this for trouble shooting
+      # fluidRow(
+      #   column(width = 6,
       #          textOutput("country_choice")), 
       #   column(width = 6, 
       #          textOutput("age_choice"))),
       # textOutput("sex_choice"),
       # textOutput("pf_choice"),
       # textOutput("ue_choice"),
+      
       tabsetPanel(
         tabPanel("Plots",
                  tags$h3("PROMIS Physical Functioning"),

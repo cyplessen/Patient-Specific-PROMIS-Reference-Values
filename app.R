@@ -24,12 +24,9 @@ flags <- c(
 source("ui.R")
 source("server.R")
 
-load("data/quantiles_shiny_pooled_pf.RData") # models object for personograph
-load("data/quantiles_shiny_pooled_ue.RData") # models object for personograph
-#load("data/plotdat_pf_sex.RData") # models object (model 5) for plotting and table
-load("data/plotdata_pf.RData") # models object (model 5) for plotting and table
-load("data/plotdata_ue.RData") # models object (model 5) for plotting and table
-load("data/plotdata_pi.RData") # models object (model 5) for plotting and table
+load("data/plotdata_pf.RData") 
+load("data/plotdata_ue.RData") 
+load("data/plotdata_pi.RData") 
 
 # Run shiny app
 runApp(shinyApp(ui, server))
