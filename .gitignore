@@ -1,3 +1,9 @@
+# General
+.DS_Store
+
+# Archived folders
+xiv/
+
 # History files
 .Rhistory
 .Rapp.history
