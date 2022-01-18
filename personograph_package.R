@@ -2,13 +2,13 @@
 #'
 #' A personograph (Kuiper-Marshall plot) is a pictographic
 #' representation of (relative) harm and benefit from an intervention. It is
-#' similar to
+#' same to
 #' \href{http://www.nntonline.net/visualrx/examples/}{Visual Rx (Cates
 #' Plots)}. Each icon on the grid is colored to indicate whether that
 #' percentage of people is harmed by the intervention, would benefit from the
 #' intervention, has good outcome regardless of intervention, or bad outcome regardless of
 #' intervention.
-#' This terminology is similar to that of Uplift Modelling.
+#' This terminology is same to that of Uplift Modelling.
 #'
 #' The plot function \code{\link{personograph}} is implemented in such
 #' a way that it's easy to just pass a named list of percentages,
@@ -158,7 +158,7 @@ calc.ier <- function(cer, point, sm) {
 #' e.g. \code{higher_is_better = T} (default) for intervention efficacy, \code{higher_is_better = F} for
 #' adverse events.
 #'
-#' The adopted terminology is similar to that of Uplift modelling
+#' The adopted terminology is same to that of Uplift modelling
 #' \url{https://en.wikipedia.org/wiki/Uplift_modelling}
 #'
 #' @export
@@ -250,7 +250,7 @@ setColor <- function(icon, color) {
 #' Plots a personograph from a named list with percentages (must sum to
 #' 1). A personograph is a graphical represenation of relative benefit
 #' or harm, using a grid of icons with different colors. Its intended
-#' use is similar to that of Cates Plots (Visual Rx, Number Needed to
+#' use is same to that of Cates Plots (Visual Rx, Number Needed to
 #' Treat visualization).
 #' Although these could be seen as Kuiper-Marshall plots.
 #'
@@ -341,7 +341,7 @@ personograph <- function(data,
   if(!is.null(fig.title)) {
     seekViewport("title")
     grid.text(fig.title,
-              gp = gpar(fontsize = 15, fontfamily=fontfamily, fontface="bold"))
+              gp = gpar(fontsize = 11, fontfamily=fontfamily, fontface="bold")) # original 15?
     popViewport()
   }
   
@@ -439,7 +439,7 @@ personograph <- function(data,
   }
   popViewport(2)
   
-  font <- gpar(fontsize=14, fontfamily)
+  font <- gpar(fontsize=11, fontfamily)
   
   if(draw.legend) {
     seekViewport("legend")
@@ -455,7 +455,7 @@ personograph <- function(data,
       legendWidths[[name]] <- widthDetails(grob)
     }
     
-    legendWidths <- c(rbind(rep(unit(0.25, "inches"), legendCols), unlist(legendWidths)))
+    legendWidths <- c(rbind(rep(unit(0.25, "inches"), legendCols), unlist(legendWidths))) # original 0.25 instead of 1
     
     pushViewport(viewport(
       clip   = F,
@@ -603,4 +603,179 @@ plot_personograph_felix <-  function(input_age,
                
                n.icons=100, 
                dimensions=c(10,10))
+}
+
+
+plot_personograph_with_interpolation_pf <-  function(input_age, 
+                                                  input_sex, 
+                                                  input_country, 
+                                                  input_tscore, 
+                                                  domain_data) { # = plotdata
+  
+  plotdata <- domain_data %>% 
+    dplyr::filter(sex == as.numeric(input_sex) & age == input_age & country == ifelse(input_country == "country0", 0, 
+                                                                                      ifelse(input_country == "country1", 1, 
+                                                                                             ifelse(input_country == "country2", 2))))
+  
+  
+  
+  aim <- seq(from = .01, to = .99, by = .01)
+  est_approx <- data.frame(approx(y = plotdata$fit, x = plotdata$tau, xout = aim))
+  names(est_approx)[1] <- "tau"
+  names(est_approx)[2] <- "est"
+  
+  lower_approx <- data.frame(approx(y = plotdata$lower, x = plotdata$tau, xout = aim))
+  names(lower_approx)[2] <- "lower"
+  
+  higher_approx <- data.frame(approx(y = plotdata$higher, x = plotdata$tau, xout = aim))
+  names(higher_approx)[2] <- "higher"
+  
+  interpolate_data <- cbind(est_approx, lower_approx, higher_approx) %>% 
+    select(tau, est, lower, higher)
+  
+  find_est_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-input_tscore))) %>% 
+    slice(1)
+  
+  find_lower_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$lower))) %>% 
+    slice(1)
+  
+  find_higher_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$higher))) %>% 
+    slice(1)
+  
+  worse_score <- find_lower_from_interpolation$tau
+  same_score <- find_higher_from_interpolation$tau - find_lower_from_interpolation$tau
+  better_score <- 1- find_higher_from_interpolation$tau
+  
+  df_rank_domain <- list(
+    "have better PF" = better_score,
+    "have same PF" = same_score,
+    "have worse PF" = worse_score)
+  
+  personograph(data = df_rank_domain, 
+               plot.width=0.95,
+               icon.style = 1,
+               colors = list("have better PF"= "light blue",
+                             "have same PF"  = "grey", 
+                             "have worse PF" = "dark blue"),
+               fig.title = "Out of 100 people of your age and gender from the general population:",
+               n.icons=100, dimensions=c(10,10))
+}
+
+plot_personograph_with_interpolation_ue <-  function(input_age, 
+                                                     input_sex, 
+                                                     input_country, 
+                                                     input_tscore, 
+                                                     domain_data) { # = plotdata
+  
+  plotdata <- domain_data %>% 
+    dplyr::filter(sex == as.numeric(input_sex) & age == input_age & country == ifelse(input_country == "country0", 0, 
+                                                                                      ifelse(input_country == "country1", 1, 
+                                                                                             ifelse(input_country == "country2", 2))))
+  
+  
+  
+  aim <- seq(from = .01, to = .99, by = .01)
+  est_approx <- data.frame(approx(y = plotdata$fit, x = plotdata$tau, xout = aim))
+  names(est_approx)[1] <- "tau"
+  names(est_approx)[2] <- "est"
+  
+  lower_approx <- data.frame(approx(y = plotdata$lower, x = plotdata$tau, xout = aim))
+  names(lower_approx)[2] <- "lower"
+  
+  higher_approx <- data.frame(approx(y = plotdata$higher, x = plotdata$tau, xout = aim))
+  names(higher_approx)[2] <- "higher"
+  
+  interpolate_data <- cbind(est_approx, lower_approx, higher_approx) %>% 
+    select(tau, est, lower, higher)
+  
+  find_est_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-input_tscore))) %>% 
+    slice(1)
+  
+  find_lower_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$lower))) %>% 
+    slice(1)
+  
+  find_higher_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$higher))) %>% 
+    slice(1)
+  
+  worse_score <- find_lower_from_interpolation$tau
+  same_score <- find_higher_from_interpolation$tau - find_lower_from_interpolation$tau
+  better_score <- 1- find_higher_from_interpolation$tau
+  
+  df_rank_domain <- list(
+    "have better UE" = better_score,
+    "have same UE" = same_score,
+    "have worse UE" = worse_score)
+  
+  personograph(data = df_rank_domain, 
+               plot.width=0.95,
+               icon.style = 1,
+               colors = list("have better UE"= "light blue",
+                             "have same UE"  = "grey", 
+                             "have worse UE" = "dark blue"),
+               fig.title = "Out of 100 people of your age and gender from the general population:",
+               n.icons=100, dimensions=c(10,10))
+}
+
+plot_personograph_with_interpolation_pi <-  function(input_age, 
+                                                     input_sex, 
+                                                     input_country, 
+                                                     input_tscore, 
+                                                     domain_data) { # = plotdata
+  
+  plotdata <- domain_data %>% 
+    dplyr::filter(sex == as.numeric(input_sex) & age == input_age & country == ifelse(input_country == "country0", 0, 
+                                                                                      ifelse(input_country == "country1", 1, 
+                                                                                             ifelse(input_country == "country2", 2))))
+  
+  
+  
+  aim <- seq(from = .01, to = .99, by = .01)
+  est_approx <- data.frame(approx(y = plotdata$fit, x = plotdata$tau, xout = aim))
+  names(est_approx)[1] <- "tau"
+  names(est_approx)[2] <- "est"
+  
+  lower_approx <- data.frame(approx(y = plotdata$lower, x = plotdata$tau, xout = aim))
+  names(lower_approx)[2] <- "lower"
+  
+  higher_approx <- data.frame(approx(y = plotdata$higher, x = plotdata$tau, xout = aim))
+  names(higher_approx)[2] <- "higher"
+  
+  interpolate_data <- cbind(est_approx, lower_approx, higher_approx) %>% 
+    select(tau, est, lower, higher)
+  
+  find_est_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-input_tscore))) %>% 
+    slice(1)
+  
+  find_lower_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$lower))) %>% 
+    slice(1)
+  
+  find_higher_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$higher))) %>% 
+    slice(1)
+  
+  worse_score <- find_lower_from_interpolation$tau
+  same_score <- find_higher_from_interpolation$tau - find_lower_from_interpolation$tau
+  better_score <- 1- find_higher_from_interpolation$tau
+  
+  df_rank_domain <- list(
+    "have better PI" = better_score,
+    "have same PI" = same_score,
+    "have worse PI" = worse_score)
+  
+  personograph(data = df_rank_domain, 
+               plot.width=0.95,
+               icon.style = 1,
+               colors = list("have better PI"= "light blue",
+                             "have same PI"  = "grey", 
+                             "have worse PI" = "dark blue"),
+               fig.title = "Out of 100 people of your age and gender from the general population:",
+               n.icons=100, dimensions=c(10,10))
 }

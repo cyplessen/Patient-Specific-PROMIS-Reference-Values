@@ -9,7 +9,10 @@
 
 ui <- fluidPage(
   pageWithSidebar(
-    "Test app",
+    
+    # Application title
+    headerPanel("Test app"),
+    
     sidebarPanel(
       tags$h3("Country"),
       radioButtons("country", 
@@ -47,6 +50,11 @@ ui <- fluidPage(
       tags$h3("PROMIS Upper Extremities"),
       numericInput("tscore_ue", 
                    "PROMIS Upper Extremities T-Score",
+                   value = 50, min = 1, max = 100),
+      
+      tags$h3("PROMIS Pain Interference"),
+      numericInput("tscore_pi", 
+                   "PROMIS Pain Interference T-Score",
                    value = 50, min = 1, max = 100)),
     mainPanel(
      # fluidRow(
@@ -62,20 +70,30 @@ ui <- fluidPage(
                  tags$h3("PROMIS Physical Functioning"),
                  fluidRow(
                    column(width = 10, plotOutput("plot_pf"))),
+                 
                  tags$h3("PROMIS Upper Extremities"),
                  fluidRow(
                    column(width = 10, plotOutput("plot_ue"))),
+                 
+                 tags$h3("PROMIS Pain Interference"),
+                 fluidRow(
+                   column(width = 10, plotOutput("plot_pi"))),
                  
         ),
         tabPanel( "Tables",
                   tags$h3("PROMIS Physical Functioning"),
                   
                   fluidRow(
-                    column(width = 10, tableOutput("table_pf_sex"))),
+                    column(width = 10, tableOutput("table_pf"))),
                   tags$h3("PROMIS Upper Extremities"),
                   
                   fluidRow(
-                    column(width = 10, tableOutput("table_ue_sex")))
+                    column(width = 10, tableOutput("table_ue"))),
+                  
+                  tags$h3("PROMIS Pain Interference"),
+                  
+                  fluidRow(
+                    column(width = 10, tableOutput("table_pi")))
         )
       )
     )

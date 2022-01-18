@@ -62,250 +62,15 @@ sets_with_plausible_values <- readRDS("data/sets_with_plausible_values2.rds")
 This document contains all data wrangling for the AO5 Shiny app. It contains the iterative processes that led to the final data and code to produce both the tables and plots.
 
 
-# Data Wrangling
+# Data
 
-## First iteration: Adapted code from Felix P29 paper PF (model 4)
-
+## PF
 ```{r}
-formula_pf <- paste0("pf_pv ~ ", "age", " + sex", " + country - 1")
-
-fit_model_shiny <- function(data) {
-  fit = rq(data = data, 
-           formula = formula_pf,  # formula from above
-           weights = GEWICHT, 
-           tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 ))
-  
-  
-  ldply(summary(fit, se = "nid"), function(x) data.frame(tau = x$tau, 
-                                                         par = rownames(x$coef), 
-                                                         x$coef[,1:2]))
-}
-
-get_pooled <- function(x) {
-  x = mi.meld(q = as.matrix(x$Value), 
-              se = as.matrix(x$Std..Error))
-  
-  return(data.frame(est = x[[1]], 
-                    se = x[[2]]))
-}
-
-quantiles_shiny <- ldply(sets_with_plausible_values, function(dat) fit_model_shiny(data = dat))
-
-quantiles_shiny_pooled_pf <- quantiles_shiny %>% 
-  group_by(tau, par) %>% 
-  do((get_pooled(.)))
-
-quantiles_shiny_pooled_pf
-
-# save(quantiles_shiny_pooled_pf, file="data/tidy/quantiles_shiny_pooled_pf.RData") data for personograph
-```
-
-<br>
-
-### Get Predicted values with upper and lower CIs manually
-```{r}
-age_var = 50
-sex_var = 0
-country = "country1"
-
-quantiles_shiny_pooled_pf %>% 
-  mutate(ci_lower = est - 1.96 * se,
-         ci_upper = est + 1.96 * se) %>% 
-  pivot_wider(names_from = par, 
-              values_from = c(est, se, ci_lower, ci_upper)) %>% 
-  mutate(old_german_dude_mean = eval(parse(text=(paste0("est_", country)))) + age_var * est_age + sex_var * est_sex,
-         old_german_dude_ci_lower = eval(parse(text=(paste0("ci_lower_", country)))) + age_var * ci_lower_age + sex_var * ci_lower_sex,
-         old_german_dude_ci_upper = eval(parse(text=(paste0("ci_upper_", country)))) + age_var * ci_upper_age + sex_var * ci_upper_sex) %>% 
-  relocate(old_german_dude_mean, old_german_dude_ci_lower, old_german_dude_ci_upper) %>% 
-  mutate(value =  paste0(round(old_german_dude_mean, 2), "<br/>[", round(old_german_dude_ci_lower,2), "-", round(old_german_dude_ci_upper,2), "]")) %>% select(tau, value) %>% 
-  pivot_wider(names_from = c(tau)) %>% 
-  mutate("PROMIS Measure" = "Physical Functioning") %>% 
-  relocate("PROMIS Measure")
-```
-
-<br>
-
-## Second iteration: Code sent from Felix to get smaller CIs
-
-### PF (model 5) without sex
-```{r}
-formula_1 <- paste0("pf_pv ~ age * country - 1")
+formula_pf <- paste0("pf_pv ~ sex + age + country - 1")
 
 fit_model <- function(data, tau) {
   fit = rq(data = data, 
-           formula = formula_1, 
-           weights = GEWICHT, 
-           tau = tau)
-}
-
-tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
-
-model_list = lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x))
-
-newdata = data.frame(age = rep(50:100, each = 3), country = factor(0:2))
-                     
-plotdat = lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
-          interval = "confidence", type = "direct")))
-
-for (i in 1:length(plotdat)){
-  plotdat[[i]]$tau = tau[i]
-}
-
-plotdat_pf = do.call(rbind, plotdat)
-
-# save(plotdat_pf, file="data/tidy/plotdat_pf.RData")
-```
-
-<br>
-
-### Felix UE (model 5)
-```{r}
-formula_1 <- paste0("ue_pv ~ age * country - 1")
-
-fit_model <- function(data, tau) {
-  fit = rq(data = data, 
-           formula = formula_1, 
-           weights = GEWICHT, 
-           tau = tau)
-}
-
-tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
-
-model_list = lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x))
-
-newdata = data.frame(age = rep(50:100, each = 3), country = factor(0:2))
-                     
-plotdat = lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
-          interval = "confidence", type = "direct")))
-
-for (i in 1:length(plotdat)){
-  plotdat[[i]]$tau = tau[i]
-}
-
-plotdat_ue = do.call(rbind, plotdat)
-
-# save(plotdat_ue, file="data/tidy/plotdat_ue.RData")
-```
-
-```{r}
-ggplot(plotdat_pf, aes(y = fit, x = age, color = country)) + 
-  geom_line() + facet_wrap(.~tau) + 
-  geom_ribbon(aes(ymin = lower, ymax = higher, fill = country), alpha = .2, color = NA)
-```
-
-<br>
-### Tables with smaller CI code form felix 
-
-```{r}
-input_country = "country1"
-
-plotdat_ue %>% 
-        filter(age == 50 & country == ifelse(input_country == "country0", 0, 
-                                  ifelse(input_country == "country1", 1, 
-                                         ifelse(input_country == "country2", 2)))) %>% 
-
-  #filter(age == 50 & country == 0) %>% 
-  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
-  select(tau, value) %>% 
-  pivot_wider(names_from = tau, values_from = value) %>% 
-  kable(format = "html",  escape = FALSE)
-```
-
-<br>
-
-## Third iteration: Adding sex to second iteration
-
-### Felix PF adding + sex (model 5)
-```{r}
-formula_1 <- paste0("pf_pv ~ sex + age * country - 1")
-
-fit_model <- function(data, tau) {
-  fit = rq(data = data, 
-           formula = formula_1, 
-           weights = GEWICHT, 
-           tau = tau)
-}
-
-tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
-
-model_list = lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x))
-
-newdata = data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
-                     
-plotdat = lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
-          interval = "confidence", type = "direct")))
-
-for (i in 1:length(plotdat)){
-  plotdat[[i]]$tau = tau[i]
-}
-
-plotdat_pf_sex = do.call(rbind, plotdat)
-
-# save(plotdat_pf_sex, file="data/tidy/plotdat_pf_sex.RData")
-```
-
-```{r}
-plotdat_pf_sex %>% 
-  mutate(gender = ifelse(sex == 1, "female", "male"),
-         country = ifelse(country == 0, "Germany", ifelse(country == 1, "UK", "USA"))) %>%
-  ggplot( aes(y = fit, x = age, color = country)) + 
-  geom_line() + facet_wrap(.~tau + gender) + 
-  geom_ribbon(aes(ymin = lower, ymax = higher, fill = country), alpha = .2, color = NA)
-```
-
-```{r}
-plotdat_pf_sex %>% 
-        filter(sex == 0 & age == 50 & country == ifelse(input_country == "country0", 0, 
-                                  ifelse(input_country == "country1", 1, 
-                                         ifelse(input_country == "country2", 2)))) %>% 
-
-  #filter(age == 50 & country == 0) %>% 
-  mutate(value = paste0(round(fit, 2), "<br/>[", round(lower, 2), "; ", round(higher, 2), "]")) %>%
-  select(tau, value) %>% 
-  pivot_wider(names_from = tau, values_from = value) %>% 
-  kable(format = "html",  escape = FALSE)
-```
-
-### Felix UE adding + sex (model 5)
-```{r}
-formula_1 <- paste0("ue_pv ~ sex + age * country - 1")
-
-fit_model <- function(data, tau) {
-  fit = rq(data = data, 
-           formula = formula_1, 
-           weights = GEWICHT, 
-           tau = tau)
-}
-
-tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
-
-model_list = lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x))
-
-newdata = data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
-                     
-plotdat = lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
-          interval = "confidence", type = "direct")))
-
-for (i in 1:length(plotdat)){
-  plotdat[[i]]$tau = tau[i]
-}
-
-plotdat_ue_sex = do.call(rbind, plotdat)
-
-# save(plotdat_ue_sex, file="data/tidy/plotdat_ue_sex.RData")
-```
-
-<br>
-
-## 4th iteration: Adding sex to second iteration
-
-### Felix PF adding + sex (model 4)
-```{r}
-formula_1 <- paste0("pf_pv ~ sex + age + country - 1")
-
-fit_model <- function(data, tau) {
-  fit = rq(data = data, 
-           formula = formula_1, 
+           formula = formula_pf, 
            weights = GEWICHT, 
            tau = tau)
 }
@@ -323,30 +88,89 @@ for (i in 1:length(plotdat)){
   plotdat[[i]]$tau = tau[i]
 }
 
-plotdat_pf_sex = do.call(rbind, plotdat)
+plotdata_pf = do.call(rbind, plotdat)
 
-# save(plotdat_pf_sex, file="data/tidy/plotdat_pf_sex.RData")
+save(plotdata_pf, file="data/plotdata_pf.RData")
+```
+
+<br>
+
+## UE
+```{r}
+formula_ue <- paste0("ue_pv ~ sex + age + country - 1")
+
+fit_model <- function(data, tau) {
+  fit = rq(data = data, 
+           formula = formula_ue, 
+           weights = GEWICHT, 
+           tau = tau)
+}
+
+tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
+
+model_list <- lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
+
+newdata <- data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+                     
+plotdat <- lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
+          interval = "confidence", type = "direct")))
+
+for (i in 1:length(plotdat)){
+  plotdat[[i]]$tau = tau[i]
+}
+
+plotdata_ue <- do.call(rbind, plotdat)
+
+save(plotdata_ue, file="data/plotdata_ue.RData")
+```
+
+## PI
+
+```{r}
+formula_pi <- paste0("pi_pv ~ sex + age + country - 1")
+
+fit_model <- function(data, tau) {
+  fit = rq(data = data, 
+           formula = formula_pi, 
+           weights = GEWICHT, 
+           tau = tau)
+}
+
+tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
+
+model_list <- lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
+
+newdata <- data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+                     
+plotdat <- lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
+          interval = "confidence", type = "direct")))
+
+for (i in 1:length(plotdat)){
+  plotdat[[i]]$tau = tau[i]
+}
+
+plotdata_pi <- do.call(rbind, plotdat)
+
+save(plotdata_pi, file="data/plotdata_pi.RData")
 ```
 
 ## Interpolate by approx()
 ```{r}
-est_approx <- data.frame(approx(y = plotdat_pf_sex$fit, x = plotdat_pf_sex$tau, xout = aim))
+aim <- seq(from = .01, to = .99, by = .01)
+est_approx <- data.frame(approx(y = plotdata_pf$fit, x = plotdata_pf$tau, xout = aim))
 names(est_approx)[1] <- "tau"
 names(est_approx)[2] <- "est"
 
-lower_approx <- data.frame(approx(y = plotdat_pf_sex$lower, x = plotdat_pf_sex$tau, xout = aim))
+lower_approx <- data.frame(approx(y = plotdata_pf$lower, x = plotdata_pf$tau, xout = aim))
 names(lower_approx)[2] <- "lower"
 
-higher_approx <- data.frame(approx(y = plotdat_pf_sex$higher, x = plotdat_pf_sex$tau, xout = aim))
+higher_approx <- data.frame(approx(y = plotdata_pf$higher, x = plotdata_pf$tau, xout = aim))
 names(higher_approx)[2] <- "higher"
 
 interpolate_data <- cbind(est_approx, lower_approx, higher_approx) %>% 
   select(tau, est, lower, higher)
 
-interpolate_data
-```
-
-```{r}
+your.number <- 70
 find_est_from_interpolation <- interpolate_data %>% 
   filter(row_number()==which.min(abs(interpolate_data$est-your.number))) %>% 
   slice(1)
@@ -362,18 +186,12 @@ find_lower_from_interpolation
 find_higher_from_interpolation <- interpolate_data %>% 
   filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$higher))) %>% 
   slice(1)
-```
 
-
-```{r}
 worse_score <- find_lower_from_interpolation$tau
 you <- find_est_from_interpolation$tau
 similar_score <- find_higher_from_interpolation$tau - find_lower_from_interpolation$tau
 better_score <- 1- find_higher_from_interpolation$tau
-```
 
-
-```{r}
 df_rank_domain <- list(
   "have better PF" = better_score,
   "have similar PF" = similar_score,
@@ -384,786 +202,149 @@ df_rank_domain <- list(
 
 ### Create personograph Plot
 ```{r}
-pdf("personograph_ci.pdf", width = 12, height = 12)
-
-personograph(data = df_rank_domain, 
-             plot.width=0.95,
-             icon.style = 1,
-             colors = list("have better PF"= "light blue",
-                           "have similar PF"  = "grey", 
-                           "have much PF" = "dark blue"),
-             fig.title = "Out of 1000 people of your age and gender from the general population:",
-              n.icons=100, dimensions=c(10,10))
-
-
-dev.off()
+#pdf("personograph_ci.pdf", width = 12, height = 12)
+#
+#personograph(data = df_rank_domain, 
+#             plot.width=0.95,
+#             icon.style = 1,
+#             colors = list("have better PF"= "light blue",
+#                           "have similar PF"  = "grey", 
+#                           "have worse PF" = "dark blue"),
+#             fig.title = "Out of 1000 people of your age and gender from the general population:",
+#              n.icons=100, dimensions=c(10,10))
+#
+#
+#dev.off()
 ```
 
-# code used in shiny app
+# Plots
 
-```{r eval = FALSE}
-plot_personograph_felix <-  function(input_age, 
-                               input_sex, 
-                               input_country, 
-                               input_tscore, 
-                               domain_data) {
+## plot_personograph_with_interpolation()
+```{r}
+plot_personograph_with_interpolation <-  function(input_age, 
+                                                  input_sex, 
+                                                  input_country, 
+                                                  input_tscore, 
+                                                  domain_data) { # = plotdata
   
-  quantiles_for_distribution <- domain_data %>% 
+  plotdata <- domain_data %>% 
     dplyr::filter(sex == as.numeric(input_sex) & age == input_age & country == ifelse(input_country == "country0", 0, 
-                                                    ifelse(input_country == "country1", 1, 
-                                                           ifelse(input_country == "country2", 2)))) %>% 
-    mutate(value = fit) %>%
-    dplyr::select(tau, value) %>% 
-    pivot_wider(names_from = tau, values_from = value)
-  
-  norm_from_quant <- get.norm.par(p=as.numeric(names(quantiles_for_distribution)),
-                                  q=as.vector(t(quantiles_for_distribution)),
-                                  show.output = F,
-                                  plot = F)
+                                                                                      ifelse(input_country == "country1", 1, 
+                                                                                             ifelse(input_country == "country2", 2))))
   
   
-  df_quant <- data.frame(
-    value = distribution_normal(n = 100, 
-                                mean = norm_from_quant[1], 
-                                sd = norm_from_quant[2]))
   
-  rank_domain <- df_quant %>% 
-    arrange(value) %>% 
-    mutate(rank = (row_number())) %>% 
-    slice(which.min(abs(value - input_tscore))) %>%  # insert PF here
-    dplyr::select(rank) %>% 
-    as.numeric()
+  aim <- seq(from = .01, to = .99, by = .01)
+  est_approx <- data.frame(approx(y = plotdata$fit, x = plotdata$tau, xout = aim))
+  names(est_approx)[1] <- "tau"
+  names(est_approx)[2] <- "est"
+  
+  lower_approx <- data.frame(approx(y = plotdata$lower, x = plotdata$tau, xout = aim))
+  names(lower_approx)[2] <- "lower"
+  
+  higher_approx <- data.frame(approx(y = plotdata$higher, x = plotdata$tau, xout = aim))
+  names(higher_approx)[2] <- "higher"
+  
+  interpolate_data <- cbind(est_approx, lower_approx, higher_approx) %>% 
+    select(tau, est, lower, higher)
+  
+  find_est_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-input_tscore))) %>% 
+    slice(1)
+  
+  find_lower_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$lower))) %>% 
+    slice(1)
+  
+  find_higher_from_interpolation <- interpolate_data %>% 
+    filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$higher))) %>% 
+    slice(1)
+  
+  worse_score <- find_lower_from_interpolation$tau
+  similar_score <- find_higher_from_interpolation$tau - find_lower_from_interpolation$tau
+  better_score <- 1- find_higher_from_interpolation$tau
   
   df_rank_domain <- list(
-    "have better physical function" = as.numeric(round((100 - rank_domain)/100, 3)),
-    "You" = as.numeric(round(.01, 3)),
-    "have worse physical function" = as.numeric(round(rank_domain/100 -.01, 3)))
+    "have better PF" = better_score,
+    "have similar PF" = similar_score,
+    "have worse PF" = worse_score)
   
   personograph(data = df_rank_domain, 
-               plot.width=0.85,
+               plot.width=0.95,
                icon.style = 1,
-               colors = list("have better physical function" = "#A3BE8C",
-                             "You"  = "black",
-                             "have worse physical function"= "#BF616A"
-               ),
+               colors = list("have better PF"= "light blue",
+                             "have similar PF"  = "grey", 
+                             "have worse PF" = "dark blue"),
                fig.title = "Out of 100 people of your age and gender from the general population:",
-               
-               n.icons=100, 
-               dimensions=c(10,10))
+               n.icons=100, dimensions=c(10,10))
 }
-
- plot_personograph_felix(input_age = input$age, 
-                      input_sex = input$sex, 
-                      input_country = input$country, 
-                      input_tscore = input$tscore_pf, 
-                      domain_data = plotdat_pf_sex)
 ```
 
-
-# Unnessessary below
-
-# random plot
-
+## PF
 ```{r}
-plotdat_pf_sex %>% 
-  mutate(gender = ifelse(sex == 1, "female", "male"),
-         country = ifelse(country == 0, "Germany", ifelse(country == 1, "UK", "USA"))) %>%
-  ggplot( aes(y = fit, x = age, color = country)) + 
-  geom_line() + facet_wrap(.~tau + gender) + 
-  geom_ribbon(aes(ymin = lower, ymax = higher, fill = country), alpha = .2, color = NA)
+plot_personograph_with_interpolation(input_age = 50,
+                                     input_sex = 1,
+                                     input_country = "country1",
+                                     input_tscore = 27,
+                                     domain_data = plotdata_pf)
 ```
 
-
+## UE
 
 ```{r}
-plotdat_pf_sex %>% 
-        filter(sex == 0 & age == 50 & country == ifelse(input_country == "country0", 0, 
-                                  ifelse(input_country == "country1", 1, 
-                                         ifelse(input_country == "country2", 2)))) %>% 
-
-  #filter(age == 50 & country == 0) %>% 
-  mutate(value = paste0(round(fit, 2), "<br/>[", round(lower, 2), "; ", round(higher, 2), "]")) %>%
-  select(tau, value) %>% 
-  pivot_wider(names_from = tau, values_from = value) %>% 
-  kable(format = "html",  escape = FALSE)
+plot_personograph_with_interpolation(input_age = 50,
+                                     input_sex = 1,
+                                     input_country = "country1",
+                                     input_tscore = 27,
+                                     domain_data = plotdata_ue)
 ```
 
-### Felix UE adding + sex (model 4)
+## PI 
 ```{r}
-formula_1 <- paste0("ue_pv ~ sex + age + country - 1")
-
-fit_model <- function(data, tau) {
-  fit = rq(data = data, 
-           formula = formula_1, 
-           weights = GEWICHT, 
-           tau = tau)
-}
-
-tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
-
-model_list = lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
-
-newdata = data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
-                     
-plotdat = lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
-          interval = "confidence", type = "direct")))
-
-for (i in 1:length(plotdat)){
-  plotdat[[i]]$tau = tau[i]
-}
-
-plotdat_ue_sex = do.call(rbind, plotdat)
-
-# save(plotdat_ue_sex, file="data/tidy/plotdat_ue_sex.RData")
+plot_personograph_with_interpolation(input_age = 50,
+                                     input_sex = 1,
+                                     input_country = "country1",
+                                     input_tscore = 27,
+                                     domain_data = plotdata_pi)
 ```
 
 <br>
 
-# Plotting 
+# Tables
 
 ## PF
 
-### Get NV from quantiles
 ```{r}
-age_var = 90
-sex_var = 1
-country = "country1"
-
-quantiles_for_distribution_pf <- quantiles_shiny_pooled_pf %>% 
-  mutate(ci_lower = est - 1.96 * se,
-         ci_upper = est + 1.96 * se) %>% 
-  pivot_wider(names_from = par, 
-              values_from = c(est, se, ci_lower, ci_upper)) %>% 
-  mutate(old_german_dude_mean = eval(parse(text=(paste0("est_", country)))) + age_var * est_age + sex_var * est_sex) %>% 
-  relocate(old_german_dude_mean) %>% 
-  mutate(value =  round(old_german_dude_mean, 2)) %>% select(tau, value) %>% 
-  pivot_wider(names_from = c(tau))
-
-quantiles_for_distribution_pf
+plotdata_pf %>% 
+  dplyr::filter(sex == 1 & age == 66 & country == 1) %>% 
+  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
+  dplyr::select(tau, value) %>% 
+  pivot_wider(names_from = tau, values_from = value)  
 ```
-
-
-```{r}
-quantiles_for_distribution_pf <- quantiles_shiny_pooled_pf %>% 
-  filter(par %in% c("age", "sex", "country1")) %>% 
-  pivot_wider(names_from = par, 
-              values_from = c(est, se)) %>% 
-  mutate(old_german_dude_mean = eval(parse(text=(paste0("est_", country)))) + age_var * est_age + sex_var * est_sex) %>% 
-  relocate(old_german_dude_mean) %>% 
-  mutate(value =  round(old_german_dude_mean, 2)) %>% select(tau, value) %>% 
-  pivot_wider(names_from = c(tau))
-
-quantiles_for_distribution_pf
-```
-
-
-```{r}
-norm_from_quant_pf <- get.norm.par(p=as.numeric(names(quantiles_for_distribution_pf)),
-                                q=as.vector(t(quantiles_for_distribution_pf)))
-
-
-```
-
-
-### Get perfect NV from mean and sd
-```{r}
-df_pf <- data.frame(
-  value = distribution_normal(n = 1000, mean = norm_from_quant_pf[1], sd = norm_from_quant_pf[2]))
-
-rank_pf <- df_pf %>% 
-  arrange(value) %>% 
-  mutate(rank = (row_number())) %>% 
-  slice(which.min(abs(value - 36))) %>%  # insert PF here
-  select(rank) %>% 
-  as.numeric()
-
-df_rank_df <- list(
-  Worse = as.numeric(round(rank_pf/1000 -.001, 3)),
-  Patient = as.numeric(round(.001, 3)),
-  Better = as.numeric(round((1000 - rank_pf)/1000, 3))
-) 
-#%>%   mutate(sum = rowSums(across(where(is.numeric))))
-```
-
-### Create personograph Plot
-```{r}
-personograph(data = df_rank_domain, 
-             plot.width=0.75,
-             icon.style = 1,
-             colors = list("have better physical function"= "#BF616A",
-                           "have similar physical function"  = "grey", 
-                           "have much worse physical function" = "#A3BE8C"),
-             fig.title = "PROMIS Physical Functioning: Patient Location",
-              n.icons=100, dimensions=c(10,10))
-```
-
-<br>
-
-
-### 3 Groups (Worse, You, Better) with 3rd iteration data
-
-```{r}
-quantiles_for_distribution <- plotdat_pf_sex %>% 
-        filter(sex == 0 & age == 50 & country == ifelse(input_country == "country0", 0, 
-                                  ifelse(input_country == "country1", 1, 
-                                         ifelse(input_country == "country2", 2)))) %>% 
-
-  #filter(age == 50 & country == 0) %>% 
-  mutate(value = fit) %>%
-  select(tau, value) %>% 
-  pivot_wider(names_from = tau, values_from = value)
-
-norm_from_quant <- get.norm.par(p=as.numeric(names(quantiles_for_distribution)),
-                                  q=as.vector(t(quantiles_for_distribution)),
-                                  show.output = F,
-                                  plot = F)
-  
-  
-  df_quant <- data.frame(
-    value = distribution_normal(n = 1000, 
-                                mean = norm_from_quant[1], 
-                                sd = norm_from_quant[2]))
-  
-  rank_domain <- df_quant %>% 
-    arrange(value) %>% 
-    mutate(rank = (row_number())) %>% 
-    slice(which.min(abs(value - input_tscore))) %>%  # insert PF here
-    select(rank) %>% 
-    as.numeric()
-  
-  df_rank_domain <- list(
-    "have better physical function" = as.numeric(round((1000 - rank_domain)/1000, 3)),
-        "You" = as.numeric(round(.001, 3)),
-    "have worse physical function" = as.numeric(round(rank_domain/1000 -.001, 3)))
-
-personograph(data = df_rank_domain, 
-             plot.width=0.95,
-             icon.style = 1,
-             colors = list("have better physical function" = "#A3BE8C",
-                           "You"  = "black",
-                           "have worse physical function"= "#BF616A"
-             ),
-             fig.title = "Out of 1000 people of your age and gender from the general population:",
-             
-             n.icons=1000, 
-             dimensions=c(20,50))
-```
-
-
-
-### 3 Groups
-```{r}
-input_age = 66
-input_sex = 1
-input_country = "country0"
-input_tscore = 66
-domain_data = quantiles_shiny_pooled_pf
-
-quantiles_for_distribution <- domain_data %>% 
-    filter(par %in% c("age", "sex", input_country)) %>% 
-    select(-se) %>% 
-    pivot_wider(names_from = par, 
-                values_from = c(est)) %>% 
-  select(country = input_country, everything()) %>% 
-    mutate(value = country + input_age * age + input_sex * #input_sex * 
-             sex) %>% 
-    select(tau, value) %>% 
-    pivot_wider(names_from = c(tau))
-
-norm_from_quant <- get.norm.par(p=as.numeric(names(quantiles_for_distribution)),
-                                  q=as.vector(t(quantiles_for_distribution)),
-                                  show.output = F,
-                                  plot = F)
-  
-  
-  df_quant <- data.frame(
-    value = distribution_normal(n = 1000, 
-                                mean = norm_from_quant[1], 
-                                sd = norm_from_quant[2]))
-  
-  rank_domain <- df_quant %>% 
-    arrange(value) %>% 
-    mutate(rank = (row_number())) %>% 
-    slice(which.min(abs(value - input_tscore))) %>%  # insert PF here
-    select(rank) %>% 
-    as.numeric()
-  
-  df_rank_domain <- list(
-    "have better physical function" = as.numeric(round((1000 - rank_domain)/1000, 3)),
-        "You" = as.numeric(round(.001, 3)),
-    "have worse physical function" = as.numeric(round(rank_domain/1000 -.001, 3)))
-
-pdf("personograph_3_groups.pdf", width = 12, height = 12)
-
-personograph(data = df_rank_domain, 
-             plot.width=0.95,
-             icon.style = 1,
-             colors = list("have better physical function" = "#A3BE8C",
-                           "You"  = "black",
-                           "have worse physical function"= "#BF616A"
-             ),
-             fig.title = "Out of 1000 people of your age and gender from the general population:",
-             
-             n.icons=1000, 
-             dimensions=c(20,50))
-dev.off()
-```
-
-### 4 groups
-```{r}
-input_age = 66
-input_sex = 1
-input_country = "country0"
-input_tscore = 66
-domain_data = quantiles_shiny_pooled_pf
-
-  quantiles_for_distribution <- domain_data %>% 
-    filter(par %in% c("age", "sex", input_country)) %>% 
-    select(-se) %>% 
-    pivot_wider(names_from = par, 
-                values_from = c(est)) %>% 
-    mutate(value = eval(parse(text=input_country)) + input_age * age + input_sex * #input_sex * 
-             sex) %>% 
-    select(tau, value) %>% 
-    pivot_wider(names_from = c(tau))
-  
-  norm_from_quant <- get.norm.par(p=as.numeric(names(quantiles_for_distribution)),
-                                  q=as.vector(t(quantiles_for_distribution)),
-                                  show.output = F,
-                                  plot = F)
-  
-  
-  df_quant <- data.frame(
-    value = distribution_normal(n = 1000, 
-                                mean = norm_from_quant[1], 
-                                sd = norm_from_quant[2]))
-  
-  rank_domain <- df_quant %>% 
-    arrange(value) %>% 
-    mutate(rank = (row_number())) %>% 
-    slice(which.min(abs(value - input_tscore))) %>%  # insert PF here
-    select(rank) %>% 
-    as.numeric()
-  
-  df_rank_domain <- list(
-    "have better physical function" = as.numeric(round((1000 - rank_domain)/1000, 3)),
-        "You" = as.numeric(round(.001, 3)),
-    "have worse physical function" = as.numeric(round((rank_domain/1000 -.001)/2, 3)),
-    
-     "have much worse physical function" = as.numeric(round((rank_domain/1000)/2, 3))
-    
-    )
-
-pdf("personograph_4_groups.pdf", width = 12, height = 12)
-
-personograph(data = df_rank_domain, 
-             plot.width=.95,
-             icon.style = 1,
-             colors = list("have better physical function" = "#A3BE8C",
-                           "You"  = "black",
-                           "have worse physical function"= "#BF616A",
-                           "have much worse physical function" = "#8B0000"
-             ),
-             fig.title = "Out of 1000 people of your age and gender from the general population:",
-             
-             n.icons=1000, 
-             dimensions=c(20, 50))
-dev.off()
-```
-
-
-### Text
-
-Out of 1000 patients with the same sex (input$sex) and age (input$age), rank-1 patients would score lower and `r 1000-rank` would score better on the PROMIS physical function domain.
 
 <br>
 
 ## UE
+
 ```{r}
-formula_ue <- paste0("ue_pv ~ ", "age", " + sex", " + country - 1")
-
-fit_model_shiny <- function(data) {
-  fit = rq(data = data, 
-      formula = formula_ue,  # formula from above
-           weights = GEWICHT, 
-           tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 ))
-
-  
-  ldply(summary(fit, se = "nid"), function(x) data.frame(tau = x$tau, 
-                                                         par = rownames(x$coef), 
-                                                         x$coef[,1:2]))
-}
-
-get_pooled <- function(x) {
-  x = mi.meld(q = as.matrix(x$Value), 
-              se = as.matrix(x$Std..Error))
-  
-  return(data.frame(est = x[[1]], 
-                    se = x[[2]]))
-}
-
-quantiles_shiny <- ldply(sets_with_plausible_values, function(dat) fit_model_shiny(data = dat))
-
-quantiles_shiny_pooled_ue <- quantiles_shiny %>% 
-  group_by(tau, par) %>% 
-  do((get_pooled(.)))
-
-quantiles_shiny_pooled_ue
-
-# save(quantiles_shiny_pooled_ue, file="data/tidy/quantiles_shiny_pooled_ue.RData")
-
+plotdata_ue %>% 
+  dplyr::filter(sex == 1 & age == 66 & country == 1) %>% 
+  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
+  dplyr::select(tau, value) %>% 
+  pivot_wider(names_from = tau, values_from = value)  
 ```
 
 <br>
 
-### Get NV from quantiles
-```{r}
-age_var = 90
-sex_var = 1
-country = "country1"
-
-quantiles_for_distribution_ue <- quantiles_shiny_pooled_ue %>% 
-  mutate(ci_lower = est - 1.96 * se,
-         ci_upper = est + 1.96 * se) %>% 
-  pivot_wider(names_from = par, 
-              values_from = c(est, se, ci_lower, ci_upper)) %>% 
-  mutate(old_german_dude_mean = eval(parse(text=(paste0("est_", country)))) + age_var * est_age + sex_var * est_sex) %>% 
-  relocate(old_german_dude_mean) %>% 
-  mutate(value =  round(old_german_dude_mean, 2)) %>% select(tau, value) %>% 
-  pivot_wider(names_from = c(tau))
-
-quantiles_for_distribution_ue
-```
-
+## PI
 
 ```{r}
-norm_from_quant_ue <- get.norm.par(p=as.numeric(names(quantiles_for_distribution_ue)),
-                                q=as.vector(t(quantiles_for_distribution_ue)))
-
-
-```
-
-
-### Get perfect NV from mean and sd
-```{r}
-df_ue <- data.frame(
-  value = distribution_normal(n = 1000, mean = norm_from_quant_ue[1], sd = norm_from_quant_ue[2]))
-
-rank_ue <- df_ue %>% 
-  arrange(value) %>% 
-  mutate(rank = (row_number())) %>% 
-  slice(which.min(abs(value - 36))) %>%  # insert PF here
-  select(rank) %>% 
-  as.numeric()
-
-df_rank_df <- list(
-  Worse = as.numeric(round(rank_ue/1000 -.001, 3)),
-  Patient = as.numeric(round(.001, 3)),
-  Better = as.numeric(round((1000 - rank_ue)/1000, 3))
-) 
-#%>%   mutate(sum = rowSums(across(where(is.numeric))))
-```
-
-### create personograph
-```{r}
-personograph(data = df_rank_df, 
-             plot.width=0.75,
-             icon.style = 1,
-             colors = list(Worse= "#BF616A",
-                           Patient  = "black", 
-                           Better = "#A3BE8C"),
-             fig.title = "PROMIS Upper Extremities: Patient Location",
-              n.icons=1000, dimensions=c(20,50))
+plotdata_pi %>% 
+  dplyr::filter(sex == 1 & age == 66 & country == 1) %>% 
+  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
+  dplyr::select(tau, value) %>% 
+  pivot_wider(names_from = tau, values_from = value)  
 ```
 
 <br>
 
-### Text
-
-Out of 1000 patients with the same sex (input$sex) and age (input$age), rank-1 patients would score lower and `r 1000-rank` would score better on the PROMIS physical function domain.
-
-
-## PF and UE
-```{r}
-domains <- c("pf_pv", "ue_pv")
-
-for (i in domains){
-formula <-  as.formula(paste(i, "~ age", " + sex", " + country - 1"))
-
-fit_model_shiny <- function(data) {
-  fit[[i]] <-  rq(data = data, 
-      formula = formula,  # formula from above
-           weights = GEWICHT, 
-           tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 ))
-
-  
-  ldply(summary(fit[[i]], se = "nid"), function(x) data.frame(tau = x$tau, 
-                                                         par = rownames(x$coef), 
-                                                         x$coef[,1:2]))
-}
-
-get_pooled <- function(x) {
-  x = mi.meld(q = as.matrix(x$Value), 
-              se = as.matrix(x$Std..Error))
-  
-  return(data.frame(est = x[[1]], 
-                    se = x[[2]]))
-}
-
-quantiles_shiny <- ldply(sets_with_plausible_values, function(dat) fit_model_shiny(data = dat))
-
-quantiles_shiny_pooled <- quantiles_shiny %>% 
-  group_by(tau, par) %>% 
-  do((get_pooled(.)))
-
-}
-
-quantiles_shiny_pooled
-```
-
-
-
-
-***
-
-# OLD CODE
-
-## code from ref for urology
-
-```{r}
-library(dplyr)
-for (i in 1:25){
-  sets_with_plausible_values[[i]] = data.frame(sets_with_plausible_values[[i]], i = i)
-}
-
-domains <- c("pf_pv", "ue_pv")
-
-newdata = data.frame(sex = 1, age = 50:100)
-
-
-res = data.frame()
-for (i in domains){
-  formula <- as.formula(paste(i, "~ age * sex"))
-  models <-  lapply(sets_with_plausible_values, function(x) rq(data = x, formula, tau = c(.05,seq(.1,.9,.1),.95)))
-  predicted <- lapply(models, function(x) data.frame(domain = i, newdata, melt(predict(x, newdata))))
-  res = rbind(res, do.call(rbind, predicted))
-}
-
-summary(models[[1]],  se = "nid")
-```
-
-
-```{r}
-res_patient = data.frame()
-for (i in domains){
-  formula = as.formula(paste(i, "~ age * sex"))
-  models = lapply(sets_with_plausible_values, function(x) rq(data = x, formula, tau = c(.05,seq(.1,.9,.1),.95)))
-  predicted = lapply(models, function(x) data.frame(domain = i, newdata, melt(predict(x, newdata))))
-  res_patient = rbind(res, do.call(rbind, predicted))
-}
-
-
-res_all_2 = res_all %>% group_by(domain, sex, age, X2) %>% summarise(value = mean(value))
-
-res_patient_2 = res_patient %>% group_by(domain, sex, age, X2) %>% summarise(value = mean(value))
-
-
-
-ggplot(res_patient_2, 
-       aes(x = age, y = value, group = X2)) +
-  geom_line() + 
-  geom_point(res_patient_2, aes(x = age, y = value, group = X2)) +
-  facet_wrap(~domain)
-
-
-head(res2)
-
-
-res2$X2 = paste0(as.numeric(gsub("tau= ", "", as.character(res2$X2)))*100, "%")
-res2$X2 = factor(res2$X2, levels = c("5%", paste0(seq(10,90,10), "%"), "95%"))
-
-#write.csv2(spread(res2, X2, value), file = "Reference_values.csv", row.names = F)
-
-
-```
-
-<br>
-
-# adapted code from shiny server
-
-```{r}
-formula_1 <- paste0("pf_pv ~ ", params$age, " + country - 1")
-
-fit_model <- function(data) {
-  fit = rq(data = data, 
-           formula = formula_1, 
-           weights = GEWICHT, 
-           tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 ))
-  
-  ldply(summary(fit, se = "nid"), function(x) data.frame(tau = x$tau, 
-                                                         par = rownames(x$coef),
-                                                         x$coef[,1:2]))
-}
-```
-
-
-```{r}
-get_pooled <- function(x) {
-  x = mi.meld(q = as.matrix(x$Value), 
-              se = as.matrix(x$Std..Error))
-  
-  return(data.frame(est = x[[1]], 
-                    se = x[[2]]))
-}
-
-crude_quantiles <- ldply(sets_with_plausible_values, 
-                         function(dat) fit_model(data = dat))
-
-crude_quantiles_pooled <- crude_quantiles %>% 
-  group_by(tau, par) %>% 
-  do((get_pooled(.)))
-```
-
-```{r}
-sets_with_plausible_values <- readRDS("data/tidy/sets_with_plausible_values.rds") 
-
-domains <- c("pf_pv", "ue_pv")
-
-models <- llply(domains, function(dom) {
-  
-  formula = as.formula(paste(dom, "~ sex + age + country")) # not -1 for shiny app?
-  
-  llply(1:25, function(i) {
-    rq(formula = formula, 
-       data = sets_with_plausible_values[[i]][, c(dom, "country", "sex", "age", "GEWICHT")], 
-       weights = GEWICHT, 
-           tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 ))
-    
-      ldply(summary(fit, se = "nid"), function(x) data.frame(tau = x$tau, 
-                                                         par = rownames(x$coef),
-                                                         x$coef[,1:2]))
-  })
-})
-
-
-
-str(models)
-```
-
-
-
-***
-# Predict + Rubins rule for shiny app from Model 2: PF ~ `r params$age` + sex + country
-
-works
-```{r}
-sets_with_plausible_values <- readRDS("data/tidy/sets_with_plausible_values.rds") 
-
-domains <- c("pf_pv", "ue_pv")
-
-models <- llply(domains, function(dom) {
-  formula = as.formula(paste(dom, "~ sex + age + country")) # not -1 for shiny app?
-  
-  llply(1:25, function(i) {
-    rq(formula = formula, 
-       data = sets_with_plausible_values[[i]][, c(dom, "country", "sex", "age", "GEWICHT")], 
-       weights = GEWICHT, 
-       tau = c(.99 ))
-  })
-})
-
-```
-
-
-```{r}
-summary(models[[1]][[1]], se = "nid")
-
-ldply(summary(models, se = "nid"), function(x) data.frame(tau = x$tau, 
-                                                          par = rownames(x$coef),
-                                                          x$coef[,1:2]))
-
-names(models) = domains
-#save(models, file = "data/tidy/qrmodels.rdata")
-```
-
-
-## get 1 predicted model
-```{r}
-domains = names(models)
-
-models$pf_pv[[1]]$model
-```
-
-
-```{r}
-oldish_german_male <- tribble( 
-  ~"country", ~ "age", ~ "sex",
-  "2", 57, 0)
-```
-
-
-https://stackoverflow.com/questions/41650656/quantreg-package-predict-rq-does-only-accept-a-single-tau
-```{r}
-lapply( c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 ), function(tau) {
-
-fit <- rq(mpg ~ disp, 
-          data = mtcars, 
-          tau = tau)
-
-predict.rq(fit, 
-           newdata = pred.df, 
-           interval = "confidence")
-})
-
-predict(models$pf_pv[[1]], 
-           newdata = oldish_german_male, 
-           #interval = "confidence",
-           se.fit = T)
-```
-
-```{r}
-pred <- list()
-for (i in 1:25) {
-  
-  pred[[i]] <- predict.rqs(models$pf_pv[[i]], 
-                       newdata = oldish_german_male, 
-                       
-                       interval = "confidence")
-}
-
-head(pred)
-```
-
-
-```{r}
-#install.packages("tidymodels")
-#install.packages("parsnip")
-library(parsnip)
-library(tidymodels)
-#predict_quantile(models$ue_pv[[1]], newdata = oldish_german_male)
-```
-
-
-```{r}
-predict(models$ue_pv[[1]], 
-        newdata = oldish_german_male)
-```
-
-### get all predicted models
-
-```{r}
-df <- ldply(domains, 
-            function(dom) data.frame(
-              domain = dom, 
-              apply(
-                ldply(1:25, 
-                      function(
-                        y) apply(
-                          coef(
-                            models[[dom]][[y]]),2, function(x) x %*% 
-                            new_data())),2,mean))) # here, defines new data mit slider daten, berechnet mittelwerte von 25 mittelwerten
-names(df)[2] = "value"
-```
-
-
-<br>
