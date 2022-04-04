@@ -1,5 +1,13 @@
+
+
+
+load("data/plotdata_pf.RData") 
+load("data/plotdata_ue.RData") 
+load("data/plotdata_pi.RData") 
+
 server <- function(input, output, session) {
 
+  
  # Keep this for trouble shooting on identifying input
  # output$country_choice <- renderText({
  #   paste0("You selected ", input$country)

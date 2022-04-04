@@ -14,9 +14,10 @@ library(dplyr)
 library(personograph) # needs to be loaded for dependencies
 source("personograph_package.R")
 
-load("data/plotdata_pf.RData") 
-load("data/plotdata_ue.RData") 
-load("data/plotdata_pi.RData") 
+
+print(dir())
+print(dir("data"))
+print(ls())
 
 countries <- c("Germany", "United Kingdom", "United States")
 
