@@ -1,3 +1,12 @@
+
+countries <- c("Germany", "United Kingdom", "United States")
+
+flags <- c(
+  "https://cdn.rawgit.com/lipis/flag-icon-css/master/flags/4x3/de.svg",
+  "https://cdn.rawgit.com/lipis/flag-icon-css/master/flags/4x3/gb.svg",
+  "https://cdn.rawgit.com/lipis/flag-icon-css/master/flags/4x3/us.svg")
+
+
 ui <- fluidPage(
   pageWithSidebar(
     
