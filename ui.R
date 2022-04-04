@@ -31,7 +31,7 @@ ui <- fluidPage(
   pageWithSidebar(
     
     # Application title
-    headerPanel("Test app"),
+    headerPanel("PROMIS Physical Function, Upper Extremity and Pain Interference Reference Scores for the elderly"),
     
     sidebarPanel(
       tags$h3("Country"),
