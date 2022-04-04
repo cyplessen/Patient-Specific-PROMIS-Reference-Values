@@ -1,6 +1,6 @@
 server <- function(input, output, session) {
 
- # Keep this for trouble shooting
+ # Keep this for trouble shooting on identifying input
  # output$country_choice <- renderText({
  #   paste0("You selected ", input$country)
  # })

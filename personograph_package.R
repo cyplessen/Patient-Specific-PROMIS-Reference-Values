@@ -551,9 +551,9 @@ plot_personograph_with_interpolation_pf <-  function(input_age,
   personograph(data = df_rank_domain, 
                plot.width=0.95,
                icon.style = 1,
-               colors = list("have better PF"= "light blue",
+               colors = list("have better PF"= "dark blue", #"#A3BE8C",
                              "have same PF"  = "grey", 
-                             "have worse PF" = "dark blue"),
+                             "have worse PF" = "light blue"), #"#BF616A"), 
                fig.title = "Out of 100 people of your age and gender from the general population:",
                n.icons=100, dimensions=c(10,10))
 }
@@ -609,9 +609,9 @@ plot_personograph_with_interpolation_ue <-  function(input_age,
   personograph(data = df_rank_domain, 
                plot.width=0.95,
                icon.style = 1,
-               colors = list("have better UE"= "light blue",
+               colors = list("have better UE"= "dark blue",#"light blue",
                              "have same UE"  = "grey", 
-                             "have worse UE" = "dark blue"),
+                             "have worse UE" = "light blue"), #"dark blue"),
                fig.title = "Out of 100 people of your age and gender from the general population:",
                n.icons=100, dimensions=c(10,10))
 }
@@ -663,13 +663,13 @@ plot_personograph_with_interpolation_pi <-  function(input_age,
     "have better PI" = better_score,
     "have same PI" = same_score,
     "have worse PI" = worse_score)
-  
+
   personograph(data = df_rank_domain, 
                plot.width=0.95,
                icon.style = 1,
-               colors = list("have better PI"= "light blue",
+               colors = list("have better PI"= "dark blue",#"light blue",
                              "have same PI"  = "grey", 
-                             "have worse PI" = "dark blue"),
+                             "have worse PI" = "light blue"), #"dark blue"),
                fig.title = "Out of 100 people of your age and gender from the general population:",
                n.icons=100, dimensions=c(10,10))
 }

@@ -49,7 +49,7 @@ ui <- fluidPage(
                    value = 50, min = 1, max = 100)),
     
     mainPanel(
-      # Keep this for trouble shooting
+      # Keep this for trouble shooting on selecting input
       # fluidRow(
       #   column(width = 6,
       #          textOutput("country_choice")), 
