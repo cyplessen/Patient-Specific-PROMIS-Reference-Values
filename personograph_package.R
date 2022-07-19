@@ -660,16 +660,16 @@ plot_personograph_with_interpolation_pi <-  function(input_age,
   better_score <- 1- find_higher_from_interpolation$tau
   
   df_rank_domain <- list(
-    "have better PI" = better_score,
-    "have same PI" = same_score,
-    "have worse PI" = worse_score)
+    "are more impaired" = better_score,
+    "are equally impaired" = same_score,
+    "are less impaired" = worse_score)
 
   personograph(data = df_rank_domain, 
                plot.width=0.95,
                icon.style = 1,
-               colors = list("have worse PI"= "dark blue",#"light blue",
-                             "have same PI"  = "grey", 
-                             "have better PI" = "light blue"), #"dark blue"),
+               colors = list("are more impaired" = "dark blue", #"light blue",
+                             "are equally impaired"  = "grey", 
+                             "are less impaired" = "light blue"), #"dark blue"),
                fig.title = "Out of 100 people of your age and gender from the general population:",
                n.icons=100, dimensions=c(10,10))
 }
