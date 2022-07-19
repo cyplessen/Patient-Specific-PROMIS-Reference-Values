@@ -667,9 +667,9 @@ plot_personograph_with_interpolation_pi <-  function(input_age,
   personograph(data = df_rank_domain, 
                plot.width=0.95,
                icon.style = 1,
-               colors = list("have better PI"= "dark blue",#"light blue",
+               colors = list("have worse PI"= "dark blue",#"light blue",
                              "have same PI"  = "grey", 
-                             "have worse PI" = "light blue"), #"dark blue"),
+                             "have better PI" = "light blue"), #"dark blue"),
                fig.title = "Out of 100 people of your age and gender from the general population:",
                n.icons=100, dimensions=c(10,10))
 }
