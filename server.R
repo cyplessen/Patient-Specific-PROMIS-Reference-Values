@@ -1,5 +1,13 @@
+
+
+
+load("data/plotdata_pf.RData") 
+load("data/plotdata_ue.RData") 
+load("data/plotdata_pi.RData") 
+
 server <- function(input, output, session) {
 
+  
  # Keep this for trouble shooting on identifying input
  # output$country_choice <- renderText({
  #   paste0("You selected ", input$country)
@@ -50,33 +58,40 @@ server <- function(input, output, session) {
   
   # Tables
   output$table_pf <- renderTable({
-    plotdata_pf %>% 
+    result = plotdata_pf %>% 
       dplyr::filter(sex == input$sex & age == input$age & country == ifelse(input$country == "country0", 0, 
                                                   ifelse(input$country == "country1", 1, 
                                                          ifelse(input$country == "country2", 2)))) %>% 
       mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
       dplyr::select(tau, value) %>% 
       pivot_wider(names_from = tau, values_from = value)  
+    colnames(result) = paste0(sprintf("%.0f", as.numeric(colnames(result))*100), "%")
+    result
+      
   })
   
   output$table_ue <- renderTable({
-    plotdata_ue %>% 
+    result = plotdata_ue %>% 
       dplyr::filter(sex == input$sex & age == input$age & country == ifelse(input$country == "country0", 0, 
                                                                      ifelse(input$country == "country1", 1, 
                                                                             ifelse(input$country == "country2", 2)))) %>% 
       mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
       dplyr::select(tau, value) %>% 
       pivot_wider(names_from = tau, values_from = value)
+    colnames(result) = paste0(sprintf("%.0f", as.numeric(colnames(result))*100), "%")
+    result
   })
   
   output$table_pi <- renderTable({
-    plotdata_pi %>% 
+    result = plotdata_pi %>% 
       dplyr::filter(sex == input$sex & age == input$age & country == ifelse(input$country == "country0", 0, 
                                                                             ifelse(input$country == "country1", 1, 
                                                                                    ifelse(input$country == "country2", 2)))) %>% 
       mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
       dplyr::select(tau, value) %>% 
       pivot_wider(names_from = tau, values_from = value)
+    colnames(result) = paste0(sprintf("%.0f", as.numeric(colnames(result))*100), "%")
+    result
   })
   
 }

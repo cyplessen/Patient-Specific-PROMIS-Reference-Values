@@ -1,8 +1,37 @@
+# Loading packages and data
+library(plyr)
+library(tidyverse)
+library(shiny)
+library(reshape)
+library(quantreg)
+library(DT)
+library(kableExtra)
+library(gridExtra)
+library(grid)
+library(bayestestR) # get perfect nv
+library(rriskDistributions) # getting nv from quantiles
+library(dplyr)
+library(personograph) # needs to be loaded for dependencies
+source("personograph_package.R")
+
+
+print(dir())
+print(dir("data"))
+print(ls())
+
+countries <- c("Germany", "United Kingdom", "United States")
+
+flags <- c(
+  "https://cdn.rawgit.com/lipis/flag-icon-css/master/flags/4x3/de.svg",
+  "https://cdn.rawgit.com/lipis/flag-icon-css/master/flags/4x3/gb.svg",
+  "https://cdn.rawgit.com/lipis/flag-icon-css/master/flags/4x3/us.svg")
+
+
 ui <- fluidPage(
   pageWithSidebar(
     
     # Application title
-    headerPanel("Test app"),
+    headerPanel("PROMIS Physical Function, Upper Extremity and Pain Interference Reference Scores for the elderly"),
     
     sidebarPanel(
       tags$h3("Country"),
