@@ -54,7 +54,7 @@ library(personograph)  # create personograph
 library(rriskDistributions) # getting nv from quantiles
 #source("data/helper functions/personograph_function.R")
 source("personograph_package.R")
-sets_with_plausible_values <- readRDS("data/sets_with_plausible_values2.rds") 
+sets_with_plausible_values <- readRDS("data/sets_with_plausible_values.rds") 
 ```
 
 # Overview
@@ -71,7 +71,7 @@ formula_pf <- paste0("pf_pv ~ sex + age + country - 1")
 fit_model <- function(data, tau) {
   fit = rq(data = data, 
            formula = formula_pf, 
-           weights = GEWICHT, 
+           #weights = GEWICHT, 
            tau = tau)
 }
 
