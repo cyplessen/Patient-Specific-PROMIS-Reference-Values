@@ -1,6 +1,7 @@
 # Loading packages and data
 
 library(dplyr)
+library(tidyr)
 library(shiny)
 library(shinycssloaders)
 library(personograph) # needs to be loaded for dependencies
@@ -44,9 +45,7 @@ ui <- fluidPage(
                    choiceValues = c("country0", "country1", "country2"),
                    selected = "country1"),
       helpText("Note:",
-               "This is an example",
-               "help text",
-               "and or explanation"),
+               "Select the patient`s country of residence."),
       tags$br(),
       tags$h3("2. Age"),
       sliderInput("age",
@@ -54,14 +53,21 @@ ui <- fluidPage(
                   min = 50,
                   max = 100, 
                   value = 65),
+      helpText("Note:",
+               "Select the patient`s age (between 50 and 100 years)."),
       tags$br(),
       tags$h3("3. Sex"),
       selectInput('sex', 
                   'Select sex:', 
                   c("Male" = 0, 
                     "Female" = 1)),
+      helpText("Note:",
+               "Select the patient`s sex."),
       tags$br(),
       tags$h3("4. PROMIS Measures"),
+      helpText("Note:",
+               "Input the patient`s T-score for the relevant PROMIS measure."),
+      tags$br(),
       tags$h4("PROMIS Physical Functioning"),
       numericInput("tscore_pf", 
                    "T-Score",
@@ -118,7 +124,7 @@ ui <- fluidPage(
                           tags$br(),
                           "In the third panel below, ", tags$b("Sex,"), "you can indicate the sex of the patient.",
                           tags$br(),
-                          "In the fourth panel below, ", tags$b("PROMIS Measures,"), ", you can input the T-Scores for PROMIS Physical Functioning, Upper Extremities, and Pain Interference.")),
+                          "In the fourth panel below, ", tags$b("PROMIS Measures,"), "you can input the T-Scores for PROMIS Physical Functioning, Upper Extremities, and Pain Interference.")),
                  
                  tags$h3("Plots"),
                  fluidRow(
