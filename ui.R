@@ -3,7 +3,6 @@
 library(dplyr)
 library(tidyr)
 library(shiny)
-library(shinycssloaders)
 library(personograph) # needs to be loaded for dependencies
 source("personograph_package.R")
 
@@ -31,7 +30,7 @@ ui <- fluidPage(
     sidebarPanel(
       tags$h3("1. Country"),
       radioButtons("country", 
-                   label = "Select country", 
+                   label = "Select the patient`s country of residence:", 
                    choiceNames = mapply(countries, 
                                         flags, 
                                         FUN = function(country, flagUrl) {
@@ -44,43 +43,34 @@ ui <- fluidPage(
                                         }, SIMPLIFY = FALSE, USE.NAMES = FALSE),
                    choiceValues = c("country0", "country1", "country2"),
                    selected = "country1"),
-      helpText("Note:",
-               "Select the patient`s country of residence."),
       tags$br(),
       tags$h3("2. Age"),
       sliderInput("age",
-                  label = "Select age",
+                  label = "Select the patient`s age (between 50 and 100 years):",
                   min = 50,
                   max = 100, 
                   value = 65),
-      helpText("Note:",
-               "Select the patient`s age (between 50 and 100 years)."),
       tags$br(),
       tags$h3("3. Sex"),
       selectInput('sex', 
-                  'Select sex:', 
+                  'Select the patient`s sex:', 
                   c("Male" = 0, 
                     "Female" = 1)),
-      helpText("Note:",
-               "Select the patient`s sex."),
       tags$br(),
       tags$h3("4. PROMIS Measures"),
       helpText("Note:",
-               "Input the patient`s T-score for the relevant PROMIS measure."),
+               "Input the patient`s", em("T-score"), "for the relevant PROMIS measure."),
       tags$br(),
-      tags$h4("PROMIS Physical Functioning"),
       numericInput("tscore_pf", 
-                   "T-Score",
+                   label = shiny::div(HTML("PROMIS Physical Functioning <em>T</em>-Score")),
                    value = 50, min = 1, max = 100),
       
-      tags$h4("PROMIS Upper Extremities"),
       numericInput("tscore_ue", 
-                   "T-Score",
+                   label = shiny::div(HTML("PROMIS Upper Extremities <em>T</em>-Score")),
                    value = 50, min = 1, max = 100),
       
-      tags$h4("PROMIS Pain Interference"),
       numericInput("tscore_pi", 
-                   " T-Score",
+                   label = shiny::div(HTML("PROMIS Pain Interference <em>T</em>-Score")),
                    value = 50, min = 1, max = 100)),
     
     mainPanel(
@@ -118,17 +108,19 @@ ui <- fluidPage(
                    column(width = 10, 
                           "On the left/above, you can see 4 different sections, in which you can enter information on your patient.",
                           tags$br(),
-                          "In the first panel, ", tags$b("Country,"), "you can enter information on the country of your patient, currently only Germany, UK, and US are implemented.",
+                          "To obtain patient-specific reference values, you need to enter:", 
                           tags$br(),
-                          "In the second panel below, ", tags$b("Age,"), "you can use the slider to select an age from 50 to 100 years.",
+                          tags$b("1. Country,"), "information on the country of your patient, currently only Germany, UK, and US are implemented.",
                           tags$br(),
-                          "In the third panel below, ", tags$b("Sex,"), "you can indicate the sex of the patient.",
+                          tags$b("2. Age,"), "use the slider to select an age from 50 to 100 years.",
                           tags$br(),
-                          "In the fourth panel below, ", tags$b("PROMIS Measures,"), "you can input the T-Scores for PROMIS Physical Functioning, Upper Extremities, and Pain Interference.")),
+                          tags$b("3. Sex,"), "indicate the sex of the patient.",
+                          tags$br(),
+                          tags$b("4. PROMIS Measures,"), "Optional/to obtain plots, you can input the T-Scores for PROMIS Physical Functioning, Upper Extremities, and Pain Interference.")),
                  
                  tags$h3("Plots"),
                  fluidRow(
-                   column(width = 10, "In the Tab", tags$b("Plots"), "you can see so called people plots that indicates how many people would achieve a higher, a similar, or a lower score than your patient",
+                   column(width = 10, "In the Tab", tags$b("Plots"), "you can see so called", tags$em("people plots"), "that indicates how many people would achieve a higher, a similar, or a lower score than your patient",
                           "These plots are based on the T-Scores you entered for PROMIS Physical Functioning, Upper Extremities, or Pain Interference and the information you entered about your patient.")),
                  
                  tags$h3("Tables"),
@@ -137,9 +129,7 @@ ui <- fluidPage(
         ),
         tabPanel("Plots",
                  helpText("Note:",
-                          "This is an example",
-                          "help text",
-                          "and or explanation"),
+                          "These plots show the patient´s position compared to a similar population based on age, sex, and country."),
                  tags$h3("PROMIS Physical Functioning (PF)"),
                  fluidRow(
                    column(width = 10, plotOutput("plot_pf"))),
@@ -150,10 +140,13 @@ ui <- fluidPage(
                  
                  tags$h3("PROMIS Pain Interference (PI)"),
                  fluidRow(
-                   column(width = 10, plotOutput("plot_pi"))),
+                   column(width = 10, plotOutput("plot_pi")))
                  
         ),
         tabPanel( "Tables",
+                  tags$br(),
+                  helpText("Note:",
+                           "These tables show the quantiles from 1% to 99%, ranging from lowest to highest possible score for each domain, based on patients with similar age, sex, and country of residence."),
                   tags$h3("PROMIS Physical Functioning"),
                   
                   fluidRow(
@@ -170,7 +163,7 @@ ui <- fluidPage(
         )
       )
     )
-  ) %>% withSpinner(color="#0dc5c1")
+  ) 
 )
 
 
