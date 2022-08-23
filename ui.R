@@ -25,7 +25,8 @@ ui <- fluidPage(
   pageWithSidebar(
     
     # Application title
-    headerPanel("PROMIS Physical Function, Upper Extremity and Pain Interference Reference Scores for Adults (50+)"),
+    #headerPanel("PROMIS Physical Function, Upper Extremity and Pain Interference Reference Scores for Adults (50+)"),
+    headerPanel(""),
     
     sidebarPanel(
       tags$h3("1. Country"),
