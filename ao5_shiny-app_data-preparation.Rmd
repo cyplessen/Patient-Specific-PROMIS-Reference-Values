@@ -3,12 +3,6 @@ title: "AO Reference Data Manuscript"
 subtitle: "4. Shiny app functions"
 author: "Constantin Yves Plessen"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-params:
-  age:
-    label: "AGE:"
-    value: age_50
-    input: select
-    choices: [age_anti_promis, age_50, age_centered]
 output:
   html_document:
     code_folding: show
@@ -19,6 +13,8 @@ output:
     toc_depth: 3
     toc_float: yes
     numbersections: TRUE
+editor_options: 
+  chunk_output_type: console
 ---
 
 
@@ -52,6 +48,10 @@ library(plotly)
 library(bayestestR) # get perfect nv
 library(personograph)  # create personograph
 library(rriskDistributions) # getting nv from quantiles
+library(parallel)
+library(pbapply)
+library(mlr)
+library(miceadds)
 #source("data/helper functions/personograph_function.R")
 source("personograph_package.R")
 sets_with_plausible_values <- readRDS("data/sets_with_plausible_values.rds") 
@@ -63,158 +63,329 @@ This document contains all data wrangling for the AO5 Shiny app. It contains the
 
 
 # Data
+# With Rubins rule
 
 ## PF
 ```{r}
-formula_pf <- paste0("pf_pv ~ sex + age + country - 1")
+tau = c(.01, .05, seq(.1,.9,.1), .95,.99)
 
-fit_model <- function(data, tau) {
-  fit = rq(data = data, 
-           formula = formula_pf, 
-           #weights = GEWICHT, 
-           tau = tau)
+models = lapply(sets_with_plausible_values, function(x) rq(pf_pv ~ country + sex + age - 1, data = x, tau = tau))
+
+vcovs = pblapply(1:length(tau), function(x) lapply(1:25, function(y) summary(models[[y]], cov=T)[[x]]$cov), cl = 9)
+params = pblapply(1:length(tau), function(x) lapply(1:25, function(y) summary(models[[y]])[[x]]$coef[,1]), cl = 9)
+pooled = lapply(1:length(tau), function(x) pool_mi( qhat=params[[x]], u=vcovs[[x]]))
+
+pooled_coefs = lapply(1:length(tau), function(x) coef(pooled[[x]]))
+pooled_vcovs = lapply(1:length(tau), function(x) vcov(pooled[[x]]))
+
+# create all values that need to be predicted
+newdata_app = data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+
+newdata <- createDummyFeatures(newdata_app,  cols ="country") %>% relocate("country.0", "country.1", "country.2", sex, age)
+
+names(newdata) <- gsub("\\.", "", names(newdata)) 
+newdata <- newdata %>% as.matrix()
+
+## data needs to be like that to work
+#newdata_felix = models$`1`$x[sample(nrow(models[[1]]$x),15),]
+#newdata_felix %>% head()
+
+plotdata_pf_rubins_rule <- lapply(1:length(tau), function(x){
+  predicted_score = newdata %*% pooled_coefs[[x]]
+  var.fit1 = diag(newdata %*% pooled_vcovs[[x]] %*% t(newdata))
+  var.fit2 = rowSums((newdata %*% pooled_vcovs[[x]]) * newdata)
+  se = sqrt(var.fit2)
+  result = data.frame(newdata, fit = predicted_score, se = se)
+  result$lo = result$fit - 1.96 * result$se
+  result$hi = result$fit + 1.96 * result$se
+  result
+})
+
+# add taus
+for (i in 1:length(plotdata_pf_rubins_rule)){
+  plotdata_pf_rubins_rule[[i]]$tau = tau[i]
 }
 
-tau = c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
+plotdata_pf_rubins_rule = do.call(rbind, plotdata_pf_rubins_rule)
 
-model_list = lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
+## make it fit the required format
+plotdata_pf_rubins_rule <- plotdata_pf_rubins_rule %>% 
+  pivot_longer(values_to = "country", cols = country0:country2) %>% 
+  mutate(COUNTRY = ifelse(name == "country0" & country == 1, 0, 
+                          ifelse(name == "country1" & country == 1, 1,
+                                 ifelse(name == "country2" & country == 1, 2, NA)))) %>% 
+  drop_na(COUNTRY) %>% 
+  select(-c(country, name)) %>% 
+  select(age, 
+         country = COUNTRY,
+         sex,
+         fit,
+         lower = lo,
+         higher = hi, 
+         tau)
 
-newdata = data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
-                     
-plotdat = lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
-          interval = "confidence", type = "direct")))
+save(plotdata_pf_rubins_rule, file="data/plotdata_pf_rubins_rule.RData")
 
-for (i in 1:length(plotdat)){
-  plotdat[[i]]$tau = tau[i]
+plotdata_pf <- plotdata_pf_rubins_rule
+```
+
+### Inspect
+```{r}
+plotdata_pf_rubins_rule %>% head()
+
+plotdata_pf_rubins_rule %>% 
+  dplyr::filter(sex == 0 & age == 50 & country == 0) %>% 
+  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
+  dplyr::select(tau, value) %>% 
+  pivot_wider(names_from = tau, values_from = value)  %>% 
+  kbl()
+```
+
+## UE
+
+```{r}
+tau = c(.01, .05, seq(.1,.9,.1), .95,.99)
+
+models = lapply(sets_with_plausible_values, function(x) rq(ue_pv ~ country + sex + age - 1, data = x, tau = tau))
+
+vcovs = pblapply(1:length(tau), function(x) lapply(1:25, function(y) summary(models[[y]], cov=T)[[x]]$cov), cl = 9)
+params = pblapply(1:length(tau), function(x) lapply(1:25, function(y) summary(models[[y]])[[x]]$coef[,1]), cl = 9)
+pooled = lapply(1:length(tau), function(x) pool_mi( qhat=params[[x]], u=vcovs[[x]]))
+
+pooled_coefs = lapply(1:length(tau), function(x) coef(pooled[[x]]))
+pooled_vcovs = lapply(1:length(tau), function(x) vcov(pooled[[x]]))
+
+# create all values that need to be predicted
+newdata_app = data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+
+newdata <- createDummyFeatures(newdata_app,  cols ="country") %>% relocate("country.0", "country.1", "country.2", sex, age)
+
+names(newdata) <- gsub("\\.", "", names(newdata)) 
+newdata <- newdata %>% as.matrix()
+
+## data needs to be like that to work
+#newdata_felix = models$`1`$x[sample(nrow(models[[1]]$x),15),]
+#newdata_felix %>% head()
+
+plotdata_ue_rubins_rule <- lapply(1:length(tau), function(x){
+  predicted_score = newdata %*% pooled_coefs[[x]]
+  var.fit1 = diag(newdata %*% pooled_vcovs[[x]] %*% t(newdata))
+  var.fit2 = rowSums((newdata %*% pooled_vcovs[[x]]) * newdata)
+  se = sqrt(var.fit2)
+  result = data.frame(newdata, fit = predicted_score, se = se)
+  result$lo = result$fit - 1.96 * result$se
+  result$hi = result$fit + 1.96 * result$se
+  result
+})
+
+# add taus
+for (i in 1:length(plotdata_ue_rubins_rule)){
+  plotdata_ue_rubins_rule[[i]]$tau = tau[i]
 }
 
-plotdata_pf = do.call(rbind, plotdat)
+plotdata_ue_rubins_rule = do.call(rbind, plotdata_ue_rubins_rule)
 
-save(plotdata_pf, file="data/plotdata_pf.RData")
+## make it fit the required format
+plotdata_ue_rubins_rule <- plotdata_ue_rubins_rule %>% 
+  pivot_longer(values_to = "country", cols = country0:country2) %>% 
+  mutate(COUNTRY = ifelse(name == "country0" & country == 1, 0, 
+                          ifelse(name == "country1" & country == 1, 1,
+                                 ifelse(name == "country2" & country == 1, 2, NA)))) %>% 
+  drop_na(COUNTRY) %>% 
+  select(-c(country, name)) %>% 
+  select(age, 
+         country = COUNTRY,
+         sex,
+         fit,
+         lower = lo,
+         higher = hi, 
+         tau)
+
+save(plotdata_ue_rubins_rule, file="data/plotdata_ue_rubins_rule.RData")
+
+plotdata_ue <- plotdata_ue_rubins_rule
+```
+
+### Inspect
+```{r}
+plotdata_ue_rubins_rule %>% head()
+
+plotdata_ue_rubins_rule %>% 
+  dplyr::filter(sex == 0 & age == 50 & country == 0) %>% 
+  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
+  dplyr::select(tau, value) %>% 
+  pivot_wider(names_from = tau, values_from = value)  %>% kbl()
+```
+
+## PI
+
+```{r}
+tau = c(.01, .05, seq(.1,.9,.1), .95,.99)
+
+models = lapply(sets_with_plausible_values, function(x) rq(pi_pv ~ country + sex + age - 1, data = x, tau = tau))
+
+vcovs = pblapply(1:length(tau), function(x) lapply(1:25, function(y) summary(models[[y]], cov=T)[[x]]$cov), cl = 9)
+params = pblapply(1:length(tau), function(x) lapply(1:25, function(y) summary(models[[y]])[[x]]$coef[,1]), cl = 9)
+pooled = lapply(1:length(tau), function(x) pool_mi( qhat=params[[x]], u=vcovs[[x]]))
+
+pooled_coefs = lapply(1:length(tau), function(x) coef(pooled[[x]]))
+pooled_vcovs = lapply(1:length(tau), function(x) vcov(pooled[[x]]))
+
+# create all values that need to be predicted
+newdata_app = data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+
+newdata <- createDummyFeatures(newdata_app,  cols ="country") %>% relocate("country.0", "country.1", "country.2", sex, age)
+
+names(newdata) <- gsub("\\.", "", names(newdata)) 
+newdata <- newdata %>% as.matrix()
+
+## data needs to be like that to work
+#newdata_felix = models$`1`$x[sample(nrow(models[[1]]$x),15),]
+#newdata_felix %>% head()
+
+plotdata_pi_rubins_rule <- lapply(1:length(tau), function(x){
+  predicted_score = newdata %*% pooled_coefs[[x]]
+  var.fit1 = diag(newdata %*% pooled_vcovs[[x]] %*% t(newdata))
+  var.fit2 = rowSums((newdata %*% pooled_vcovs[[x]]) * newdata)
+  se = sqrt(var.fit2)
+  result = data.frame(newdata, fit = predicted_score, se = se)
+  result$lo = result$fit - 1.96 * result$se
+  result$hi = result$fit + 1.96 * result$se
+  result
+})
+
+# add taus
+for (i in 1:length(plotdata_pi_rubins_rule)){
+  plotdata_pi_rubins_rule[[i]]$tau = tau[i]
+}
+
+plotdata_pi_rubins_rule = do.call(rbind, plotdata_pi_rubins_rule)
+
+## make it fit the required format
+plotdata_pi_rubins_rule <- plotdata_pi_rubins_rule %>% 
+  pivot_longer(values_to = "country", cols = country0:country2) %>% 
+  mutate(COUNTRY = ifelse(name == "country0" & country == 1, 0, 
+                          ifelse(name == "country1" & country == 1, 1,
+                                 ifelse(name == "country2" & country == 1, 2, NA)))) %>% 
+  drop_na(COUNTRY) %>% 
+  select(-c(country, name)) %>% 
+  select(age, 
+         country = COUNTRY,
+         sex,
+         fit,
+         lower = lo,
+         higher = hi, 
+         tau)
+
+save(plotdata_pi_rubins_rule, file="data/plotdata_pi_rubins_rule.RData")
+
+plotdata_pi <- plotdata_pi_rubins_rule
+```
+
+### Inspect
+```{r}
+plotdata_pi_rubins_rule %>% head()
+
+plotdata_pi_rubins_rule %>% 
+  dplyr::filter(sex == 0 & age == 50 & country == 0) %>% 
+  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
+  dplyr::select(tau, value) %>% 
+  pivot_wider(names_from = tau, values_from = value)  %>% kbl()
+```
+
+
+# Without rubins rule
+
+## PF
+```{r}
+# formula_pf <- paste0("pf_pv ~ sex + age + country - 1")
+# 
+# fit_model <- function(data, tau) {
+#   fit = rq(data = data, 
+#            formula = formula_pf, 
+#            tau = tau)
+# }
+# 
+# tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
+# 
+# model_list = lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
+# 
+# newdata = data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+# 
+# plotdat = lapply(model_list, function(x) data.frame(newdata, 
+#                                                     predict(x, 
+#                                                             newdata = newdata,
+#                                                             interval = "confidence", 
+#                                                             type = "direct")))
+# 
+# for (i in 1:length(plotdat)){
+#   plotdat[[i]]$tau = tau[i]
+# }
+# 
+# plotdata_pf = do.call(rbind, plotdat)
+# 
+# save(plotdata_pf, file="data/plotdata_pf.RData")
 ```
 
 <br>
 
 ## UE
 ```{r}
-formula_ue <- paste0("ue_pv ~ sex + age + country - 1")
-
-fit_model <- function(data, tau) {
-  fit = rq(data = data, 
-           formula = formula_ue, 
-           weights = GEWICHT, 
-           tau = tau)
-}
-
-tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
-
-model_list <- lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
-
-newdata <- data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
-                     
-plotdat <- lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
-          interval = "confidence", type = "direct")))
-
-for (i in 1:length(plotdat)){
-  plotdat[[i]]$tau = tau[i]
-}
-
-plotdata_ue <- do.call(rbind, plotdat)
-
-save(plotdata_ue, file="data/plotdata_ue.RData")
+# formula_ue <- paste0("ue_pv ~ sex + age + country - 1")
+# 
+# fit_model <- function(data, tau) {
+#   fit = rq(data = data, 
+#            formula = formula_ue, 
+#            weights = GEWICHT, 
+#            tau = tau)
+# }
+# 
+# tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
+# 
+# model_list <- lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
+# 
+# newdata <- data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+#                      
+# plotdat <- lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
+#           interval = "confidence", type = "direct")))
+# 
+# for (i in 1:length(plotdat)){
+#   plotdat[[i]]$tau = tau[i]
+# }
+# 
+# plotdata_ue <- do.call(rbind, plotdat)
+# 
+# save(plotdata_ue, file="data/plotdata_ue.RData")
 ```
 
 ## PI
 
 ```{r}
-formula_pi <- paste0("pi_pv ~ sex + age + country - 1")
-
-fit_model <- function(data, tau) {
-  fit = rq(data = data, 
-           formula = formula_pi, 
-           weights = GEWICHT, 
-           tau = tau)
-}
-
-tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
-
-model_list <- lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
-
-newdata <- data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
-                     
-plotdat <- lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
-          interval = "confidence", type = "direct")))
-
-for (i in 1:length(plotdat)){
-  plotdat[[i]]$tau = tau[i]
-}
-
-plotdata_pi <- do.call(rbind, plotdat)
-
-save(plotdata_pi, file="data/plotdata_pi.RData")
-```
-
-## Interpolate by approx()
-```{r}
-aim <- seq(from = .01, to = .99, by = .01)
-est_approx <- data.frame(approx(y = plotdata_pf$fit, x = plotdata_pf$tau, xout = aim))
-names(est_approx)[1] <- "tau"
-names(est_approx)[2] <- "est"
-
-lower_approx <- data.frame(approx(y = plotdata_pf$lower, x = plotdata_pf$tau, xout = aim))
-names(lower_approx)[2] <- "lower"
-
-higher_approx <- data.frame(approx(y = plotdata_pf$higher, x = plotdata_pf$tau, xout = aim))
-names(higher_approx)[2] <- "higher"
-
-interpolate_data <- cbind(est_approx, lower_approx, higher_approx) %>% 
-  select(tau, est, lower, higher)
-
-your.number <- 70
-find_est_from_interpolation <- interpolate_data %>% 
-  filter(row_number()==which.min(abs(interpolate_data$est-your.number))) %>% 
-  slice(1)
-
-find_est_from_interpolation
-
-find_lower_from_interpolation <- interpolate_data %>% 
-  filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$lower))) %>% 
-  slice(1)
-
-find_lower_from_interpolation
-
-find_higher_from_interpolation <- interpolate_data %>% 
-  filter(row_number()==which.min(abs(interpolate_data$est-find_est_from_interpolation$higher))) %>% 
-  slice(1)
-
-worse_score <- find_lower_from_interpolation$tau
-you <- find_est_from_interpolation$tau
-similar_score <- find_higher_from_interpolation$tau - find_lower_from_interpolation$tau
-better_score <- 1- find_higher_from_interpolation$tau
-
-df_rank_domain <- list(
-  "have better PF" = better_score,
-  "have similar PF" = similar_score,
-  "have much PF" = worse_score
-)
-```
-
-
-### Create personograph Plot
-```{r}
-#pdf("personograph_ci.pdf", width = 12, height = 12)
-#
-#personograph(data = df_rank_domain, 
-#             plot.width=0.95,
-#             icon.style = 1,
-#             colors = list("have better PF"= "light blue",
-#                           "have similar PF"  = "grey", 
-#                           "have worse PF" = "dark blue"),
-#             fig.title = "Out of 1000 people of your age and gender from the general population:",
-#              n.icons=100, dimensions=c(10,10))
-#
-#
-#dev.off()
+# formula_pi <- paste0("pi_pv ~ sex + age + country - 1")
+# 
+# fit_model <- function(data, tau) {
+#   fit = rq(data = data, 
+#            formula = formula_pi, 
+#            weights = GEWICHT, 
+#            tau = tau)
+# }
+# 
+# tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
+# 
+# model_list <- lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
+# 
+# newdata <- data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+#                      
+# plotdat <- lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
+#           interval = "confidence", type = "direct")))
+# 
+# for (i in 1:length(plotdat)){
+#   plotdat[[i]]$tau = tau[i]
+# }
+# 
+# plotdata_pi <- do.call(rbind, plotdat)
+# 
+# save(plotdata_pi, file="data/plotdata_pi.RData")
 ```
 
 # Plots
