@@ -109,7 +109,7 @@ for (i in 1:length(plotdata_pf_rubins_rule)){
 plotdata_pf_rubins_rule = do.call(rbind, plotdata_pf_rubins_rule)
 
 ## make it fit the required format
-plotdata_pf_rubins_rule <- plotdata_pf_rubins_rule %>% 
+plotdata_pf <- plotdata_pf_rubins_rule %>% 
   pivot_longer(values_to = "country", cols = country0:country2) %>% 
   mutate(COUNTRY = ifelse(name == "country0" & country == 1, 0, 
                           ifelse(name == "country1" & country == 1, 1,
@@ -124,21 +124,7 @@ plotdata_pf_rubins_rule <- plotdata_pf_rubins_rule %>%
          higher = hi, 
          tau)
 
-save(plotdata_pf_rubins_rule, file="data/plotdata_pf_rubins_rule.RData")
-
-plotdata_pf <- plotdata_pf_rubins_rule
-```
-
-### Inspect
-```{r}
-plotdata_pf_rubins_rule %>% head()
-
-plotdata_pf_rubins_rule %>% 
-  dplyr::filter(sex == 0 & age == 50 & country == 0) %>% 
-  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
-  dplyr::select(tau, value) %>% 
-  pivot_wider(names_from = tau, values_from = value)  %>% 
-  kbl()
+save(plotdata_pf, file="data/plotdata_pf.RData")
 ```
 
 ## UE
@@ -186,7 +172,7 @@ for (i in 1:length(plotdata_ue_rubins_rule)){
 plotdata_ue_rubins_rule = do.call(rbind, plotdata_ue_rubins_rule)
 
 ## make it fit the required format
-plotdata_ue_rubins_rule <- plotdata_ue_rubins_rule %>% 
+plotdata_ue <- plotdata_ue_rubins_rule %>% 
   pivot_longer(values_to = "country", cols = country0:country2) %>% 
   mutate(COUNTRY = ifelse(name == "country0" & country == 1, 0, 
                           ifelse(name == "country1" & country == 1, 1,
@@ -201,20 +187,7 @@ plotdata_ue_rubins_rule <- plotdata_ue_rubins_rule %>%
          higher = hi, 
          tau)
 
-save(plotdata_ue_rubins_rule, file="data/plotdata_ue_rubins_rule.RData")
-
-plotdata_ue <- plotdata_ue_rubins_rule
-```
-
-### Inspect
-```{r}
-plotdata_ue_rubins_rule %>% head()
-
-plotdata_ue_rubins_rule %>% 
-  dplyr::filter(sex == 0 & age == 50 & country == 0) %>% 
-  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
-  dplyr::select(tau, value) %>% 
-  pivot_wider(names_from = tau, values_from = value)  %>% kbl()
+save(plotdata_ue, file="data/plotdata_ue.RData")
 ```
 
 ## PI
@@ -262,7 +235,7 @@ for (i in 1:length(plotdata_pi_rubins_rule)){
 plotdata_pi_rubins_rule = do.call(rbind, plotdata_pi_rubins_rule)
 
 ## make it fit the required format
-plotdata_pi_rubins_rule <- plotdata_pi_rubins_rule %>% 
+plotdata_pi <- plotdata_pi_rubins_rule %>% 
   pivot_longer(values_to = "country", cols = country0:country2) %>% 
   mutate(COUNTRY = ifelse(name == "country0" & country == 1, 0, 
                           ifelse(name == "country1" & country == 1, 1,
@@ -277,115 +250,102 @@ plotdata_pi_rubins_rule <- plotdata_pi_rubins_rule %>%
          higher = hi, 
          tau)
 
-save(plotdata_pi_rubins_rule, file="data/plotdata_pi_rubins_rule.RData")
-
-plotdata_pi <- plotdata_pi_rubins_rule
-```
-
-### Inspect
-```{r}
-plotdata_pi_rubins_rule %>% head()
-
-plotdata_pi_rubins_rule %>% 
-  dplyr::filter(sex == 0 & age == 50 & country == 0) %>% 
-  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
-  dplyr::select(tau, value) %>% 
-  pivot_wider(names_from = tau, values_from = value)  %>% kbl()
+save(plotdata_pi, file="data/plotdata_pi.RData")
 ```
 
 
-# Without rubins rule
+# Testing
 
-## PF
+## PF (Without rubins rule)
 ```{r}
-# formula_pf <- paste0("pf_pv ~ sex + age + country - 1")
-# 
-# fit_model <- function(data, tau) {
-#   fit = rq(data = data, 
-#            formula = formula_pf, 
-#            tau = tau)
-# }
-# 
-# tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
-# 
-# model_list = lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
-# 
-# newdata = data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
-# 
-# plotdat = lapply(model_list, function(x) data.frame(newdata, 
-#                                                     predict(x, 
-#                                                             newdata = newdata,
-#                                                             interval = "confidence", 
-#                                                             type = "direct")))
-# 
-# for (i in 1:length(plotdat)){
-#   plotdat[[i]]$tau = tau[i]
-# }
-# 
-# plotdata_pf = do.call(rbind, plotdat)
-# 
-# save(plotdata_pf, file="data/plotdata_pf.RData")
+formula_pf <- paste0("pf_pv ~ sex + age + country - 1")
+
+fit_model <- function(data, tau) {
+  fit = rq(data = data,
+           formula = formula_pf,
+           tau = tau)
+}
+
+tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
+
+model_list = lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
+
+newdata = data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+
+plotdat = lapply(model_list, function(x) data.frame(newdata,
+                                                    predict(x,
+                                                            newdata = newdata,
+                                                            interval = "confidence",
+                                                            type = "direct")))
+
+for (i in 1:length(plotdat)){
+  plotdat[[i]]$tau = tau[i]
+}
+
+plotdata_pf_no_RR = do.call(rbind, plotdat)
+
+#save(plotdata_pf, file="data/plotdata_pf.RData")
 ```
 
 <br>
 
 ## UE
 ```{r}
-# formula_ue <- paste0("ue_pv ~ sex + age + country - 1")
-# 
-# fit_model <- function(data, tau) {
-#   fit = rq(data = data, 
-#            formula = formula_ue, 
-#            weights = GEWICHT, 
-#            tau = tau)
-# }
-# 
-# tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
-# 
-# model_list <- lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
-# 
-# newdata <- data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
-#                      
-# plotdat <- lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
-#           interval = "confidence", type = "direct")))
-# 
-# for (i in 1:length(plotdat)){
-#   plotdat[[i]]$tau = tau[i]
-# }
-# 
-# plotdata_ue <- do.call(rbind, plotdat)
-# 
-# save(plotdata_ue, file="data/plotdata_ue.RData")
+formula_ue <- paste0("ue_pv ~ sex + age + country - 1")
+
+fit_model <- function(data, tau) {
+  fit = rq(data = data,
+           formula = formula_ue,
+           weights = GEWICHT,
+           tau = tau)
+}
+
+tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
+
+model_list <- lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
+
+newdata <- data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+
+plotdat <- lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
+          interval = "confidence", type = "direct")))
+
+for (i in 1:length(plotdat)){
+  plotdat[[i]]$tau = tau[i]
+}
+
+plotdata_ue_no_RR <- do.call(rbind, plotdat)
+
+#save(plotdata_ue, file="data/plotdata_ue.RData")
 ```
 
 ## PI
 
 ```{r}
-# formula_pi <- paste0("pi_pv ~ sex + age + country - 1")
-# 
-# fit_model <- function(data, tau) {
-#   fit = rq(data = data, 
-#            formula = formula_pi, 
-#            weights = GEWICHT, 
-#            tau = tau)
-# }
-# 
-# tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
-# 
-# model_list <- lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
-# 
-# newdata <- data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
-#                      
-# plotdat <- lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
-#           interval = "confidence", type = "direct")))
-# 
-# for (i in 1:length(plotdat)){
-#   plotdat[[i]]$tau = tau[i]
-# }
-# 
-# plotdata_pi <- do.call(rbind, plotdat)
-# 
-# save(plotdata_pi, file="data/plotdata_pi.RData")
+formula_pi <- paste0("pi_pv ~ sex + age + country - 1")
+
+fit_model <- function(data, tau) {
+  fit = rq(data = data,
+           formula = formula_pi,
+           weights = GEWICHT,
+           tau = tau)
+}
+
+tau <- c(.01, .05, .1, .2, .3, .4, .5, .6, .7, .8, .9, .95, .99 )
+
+model_list <- lapply(tau, function(x)  fit_model(sets_with_plausible_values[[1]], tau = x)) # NO RUBINS RULE!!!!!
+
+newdata <- data.frame(age = rep(50:100, each = 6), country = factor(0:2), sex = 0:1)
+
+plotdat <- lapply(model_list, function(x) data.frame(newdata, predict(x, newdata = newdata,
+          interval = "confidence", type = "direct")))
+
+for (i in 1:length(plotdat)){
+  plotdat[[i]]$tau = tau[i]
+}
+
+plotdata_pi_no_RR <- do.call(rbind, plotdat)
+
+#save(plotdata_pi, file="data/plotdata_pi.RData")
 ```
 
 # Plots
@@ -487,10 +447,16 @@ plot_personograph_with_interpolation(input_age = 50,
 
 ```{r}
 plotdata_pf %>% 
-  dplyr::filter(sex == 1 & age == 66 & country == 1) %>% 
+  dplyr::filter(sex == 0 & age == 50 & country == 0) %>% 
   mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
   dplyr::select(tau, value) %>% 
-  pivot_wider(names_from = tau, values_from = value)  
+  pivot_wider(names_from = tau, values_from = value)   %>% tibble()
+
+plotdata_pf_no_RR %>% 
+  dplyr::filter(sex == 0 & age == 50 & country == 0) %>% 
+  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
+  dplyr::select(tau, value) %>% 
+  pivot_wider(names_from = tau, values_from = value)   %>% tibble()
 ```
 
 <br>
@@ -502,7 +468,13 @@ plotdata_ue %>%
   dplyr::filter(sex == 1 & age == 66 & country == 1) %>% 
   mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
   dplyr::select(tau, value) %>% 
-  pivot_wider(names_from = tau, values_from = value)  
+  pivot_wider(names_from = tau, values_from = value)   %>% kbl()
+
+plotdata_ue_no_RR %>% 
+  dplyr::filter(sex == 1 & age == 66 & country == 1) %>% 
+  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
+  dplyr::select(tau, value) %>% 
+  pivot_wider(names_from = tau, values_from = value)  %>% kbl()
 ```
 
 <br>
@@ -514,7 +486,13 @@ plotdata_pi %>%
   dplyr::filter(sex == 1 & age == 66 & country == 1) %>% 
   mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
   dplyr::select(tau, value) %>% 
-  pivot_wider(names_from = tau, values_from = value)  
+  pivot_wider(names_from = tau, values_from = value)   %>% kbl()
+
+plotdata_pi_no_RR%>% 
+  dplyr::filter(sex == 1 & age == 66 & country == 1) %>% 
+  mutate(value = paste0(round(fit, 2), " [", round(lower, 2), "; ", round(higher, 2), "]")) %>%
+  dplyr::select(tau, value) %>% 
+  pivot_wider(names_from = tau, values_from = value)  %>% kbl()
 ```
 
 <br>
