@@ -52,7 +52,6 @@ library(parallel)
 library(pbapply)
 library(mlr)
 library(miceadds)
-#source("data/helper functions/personograph_function.R")
 source("personograph_package.R")
 sets_with_plausible_values <- readRDS("data/sets_with_plausible_values.rds") 
 ```

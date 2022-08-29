@@ -1,5 +1,4 @@
 # Loading packages and data
-
 library(dplyr)
 library(tidyr)
 library(shiny)
