@@ -223,12 +223,16 @@ round.standard <- function(x) {
   floor(x + sign(x) * 0.5)
 }
 
-round.with.warn <- function(x, f=round.standard, name=NULL) {
-  rounded <- f(x)
-  if(x > 0 && rounded == 0) {
-    warning(paste("truncating", ifelse(is.null(name), "a", name), "non-zero value of", x, "to 0"))
-  }
-  rounded
+#round.with.warn <- function(x, f=round.standard, name=NULL) {
+#  rounded <- f(x)
+#  if(x > 0 && rounded == 0) {
+#    warning(paste("truncating", ifelse(is.null(name), "a", name), "non-zero value of", x, "to 0"))
+#  }
+#  rounded
+#}
+
+simple_round <- function(x, f=base::round) {
+  return(f(x))
 }
 
 naturalfreq <- function(ar, denominator=100) {
@@ -371,7 +375,8 @@ personograph <- function(data,
   
   rounded <- round(cum_data * n.icons)
   rounded[2:n.elements] <- rounded[2:n.elements] - rounded[1:n.elements-1]
-  counts <- round.with.warn(rounded, f=round.fn, name=name)
+  #counts <- round.with.warn(rounded, f=round.fn, name=name) # results in warning/error Warning in x > 0 && rounded == 0 :  'length(x) = 4 > 1' in coercion to 'logical(1)'
+  counts <- simple_round(rounded, f=round.fn)  # Assuming round.fn is a valid rounding function you've defined
   
   if(sum(unlist(counts)) < n.icons) {
     ordered.names <- data.names[order(unlist(counts))]
