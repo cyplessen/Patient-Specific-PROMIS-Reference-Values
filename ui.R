@@ -2,6 +2,7 @@
 library(dplyr)
 library(tidyr)
 library(shiny)
+#devtools::install_github("joelkuiper/personograph")
 library(personograph) # needs to be loaded for dependencies
 source("personograph_package.R")
 
